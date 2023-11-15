@@ -1,0 +1,29 @@
+<figure class="map">
+  <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
+    <g class="coordinates-grid" opacity="0.2" stroke="white">
+      <% (-90..90).step(10) do |lat| %>
+        <%= line(*robinson_svg(lat, -180), *robinson_svg(lat, 180), "stroke-width": (lat == 0 ? 1 : 0.3)) %>
+        <%= text(*robinson_svg(lat+1, 1), latitude(lat)) if lat < 90 %>
+      <% end %>
+      <% (-180..180).step(10) do |lng| %>
+        <% points = (-90..90).step(5).map { |lat| robinson_svg(lat, lng) } %>
+        <%= polyline(points, "stroke-width": (lng == 0 ? 1 : 0.3)) %>
+        <%= text(*robinson_svg(1, lng+1), longitude(lng)) if lng != 0 %>
+      <% end %>
+    </g>
+    <% if Rails.env.development? and false %>
+      <g class="coordinates-alignement-helpers">
+        <%= marker(986, 245, text: "40°N 0°E", stroke: 'red') %>
+        <%= marker(703, 502, text: "0°N 50°W", stroke: 'red') %>
+        <%= marker(1666, 502, text: "0°N 120°E", stroke: 'red') %>
+        <%= marker(1889, 566, text: "-10°N 160°E", stroke: 'red') %>
+        <%= marker(642, 821, text: "-50°N 70°W", stroke: 'red') %>
+        <%= marker(596, 631, text: "-20°N 70°W", stroke: 'red') %>
+        <%= marker(456, 65, text: "70°N 130°W", stroke: 'red') %>
+        <%= marker(95, 374, text: "20°N 160°W", stroke: 'red') %>
+      </g>
+    <% end %>
+  </svg>
+  <%= InternetHelper::SVG_MAP %>
+  <figcaption>Map based on <a href="https://simplemaps.com/resources/svg-world" target="_blank">simplemaps.com</a></figcaption>
+</figure>

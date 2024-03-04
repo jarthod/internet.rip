@@ -1,4 +1,4 @@
-# internet.rip (or ripinter.net)
+# (×\_×) Internet.RIP (or RIPinter.net)
 
 The purpose of this this small Rails application is to provider a simple & high-level status page for the internet.
 

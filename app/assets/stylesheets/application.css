@@ -70,6 +70,11 @@ figure.map {
     position: absolute;
     top: 0;
     left: 0;
+    path {
+    }
+    path:hover {
+      fill: var(--dim-color);
+    }
   }
 }
 
@@ -82,7 +87,11 @@ figcaption {
   font-size: 0.75em;
 }
 
+/* Too small to see otherwise */
 .PF {
-  fill: white;
-  stroke: white;
+  stroke: var(--basemap-fill);
+}
+
+.FR {
+  fill: var(--text-color);
 }

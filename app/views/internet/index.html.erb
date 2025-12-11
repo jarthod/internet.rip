@@ -1,7 +1,7 @@
 <figure class="map">
   <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
     <g class="coordinates-grid" opacity="0.2" stroke="white">
-      <% (-90..90).step(10) do |lat| %>
+      <% (-50..80).step(10) do |lat| %>
         <%= line(*robinson_svg(lat, -180), *robinson_svg(lat, 180), "stroke-width": (lat == 0 ? 1 : 0.3)) %>
         <%= text(*robinson_svg(lat+1, 1), latitude(lat)) if lat < 90 %>
       <% end %>

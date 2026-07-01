@@ -1,10 +1,10 @@
 source "https://rubygems.org"
 
-ruby "3.1.2"
+ruby "4.0.1"
 
-gem "rails", "~> 7.1.2"
+gem "rails", "~> 8.1.0"
 gem "propshaft"
-gem "sqlite3", "~> 1.5"
+gem "sqlite3", "~> 2.1"
 gem "puma", ">= 5.0"
 gem "importmap-rails"
 # gem "turbo-rails"

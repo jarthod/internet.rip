@@ -98,7 +98,6 @@ figure.map > svg:not(.grid):not(.infra):not(.overlay) path:hover { fill: var(--d
 
 /* Too small to see otherwise (base map quirks) */
 .PF { stroke: var(--basemap-fill); }
-.FR { fill: var(--text-color); }
 
 /* Infrastructure dots */
 svg.infra { pointer-events: none; }
@@ -212,6 +211,11 @@ figure.map path { transition: fill 0.6s ease; }
   white-space: nowrap;
   max-width: 9em;
 }
+/* Service status text can be a few words — let it show in full (wrap) instead
+   of truncating; the name stays fixed and the status takes the remaining width. */
+.status-list.services li a { flex: none; }
+.status-list.services .detail { max-width: none; white-space: normal; overflow: visible; text-overflow: clip; }
+
 .tld-list li a { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tld-list .spark { flex: none; }
 .tld-list .detail { margin-left: 0.5em; max-width: none; }

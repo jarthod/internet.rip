@@ -72,12 +72,12 @@
     <% if @services.loading? %>
       <p class="loading">loading&hellip;</p>
     <% else %>
-      <ul class="status-list">
+      <ul class="status-list services">
         <% @services.data.each do |svc| %>
           <li>
             <span class="dot <%= status_class(svc[:indicator]) %>"></span>
             <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
-            <span class="detail"><%= svc[:description] || svc[:indicator] %></span>
+            <span class="detail"><%= svc[:indicator] == "none" ? "Operational" : (svc[:description].presence || svc[:indicator]) %></span>
           </li>
         <% end %>
       </ul>

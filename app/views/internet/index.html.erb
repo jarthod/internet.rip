@@ -1,5 +1,6 @@
 <figure class="map">
-  <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
+  <%# Layer 1: coordinate grid (also sets the intrinsic size of the stack) %>
+  <svg class="grid" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
     <g class="coordinates-grid" opacity="0.2" stroke="white">
       <% (-50..80).step(10) do |lat| %>
         <%= line(*robinson_svg(lat, -180), *robinson_svg(lat, 180), "stroke-width": (lat == 0 ? 1 : 0.3)) %>
@@ -11,19 +12,31 @@
         <%= text(*robinson_svg(1, lng+1), longitude(lng)) if lng != 0 %>
       <% end %>
     </g>
-    <% if Rails.env.development? and false %>
-      <g class="coordinates-alignement-helpers">
-        <%= marker(986, 245, text: "40°N 0°E", stroke: 'red') %>
-        <%= marker(703, 502, text: "0°N 50°W", stroke: 'red') %>
-        <%= marker(1666, 502, text: "0°N 120°E", stroke: 'red') %>
-        <%= marker(1889, 566, text: "-10°N 160°E", stroke: 'red') %>
-        <%= marker(642, 821, text: "-50°N 70°W", stroke: 'red') %>
-        <%= marker(596, 631, text: "-20°N 70°W", stroke: 'red') %>
-        <%= marker(456, 65, text: "70°N 130°W", stroke: 'red') %>
-        <%= marker(95, 374, text: "20°N 160°W", stroke: 'red') %>
-      </g>
-    <% end %>
   </svg>
+
+  <%# Layer 2: the country shapes %>
   <%= InternetHelper::SVG_MAP %>
-  <figcaption>Map based on <a href="https://simplemaps.com/resources/svg-world" target="_blank">simplemaps.com</a></figcaption>
+
+  <%# Layer 3: submarine cable routes (static; no live status is published) %>
+  <svg class="cables-layer" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
+    <%= cables_layer(Infrastructure.submarine_cables) %>
+  </svg>
+
+  <%# Layer 4: static internet infrastructure (IXPs + cable landing stations) %>
+  <svg class="infra" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
+    <%= infra_layer(Infrastructure.landing_stations, r: 0.8, css_class: "landing-stations") %>
+    <%= infra_layer(Infrastructure.ixps, r: 1.1, css_class: "ixps") %>
+  </svg>
+
+  <%# Layer 4+: everything that changes over time, polled by dashboard.js %>
+  <div id="live" data-refresh-url="<%= live_path %>">
+    <%= render "live" %>
+  </div>
+
+  <figcaption>
+    Map based on <a href="https://simplemaps.com/resources/svg-world" target="_blank">simplemaps.com</a> ·
+    IXPs from <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a> ·
+    submarine cables &amp; landings from <a href="https://www.submarinecablemap.com" target="_blank">TeleGeography</a> ·
+    outages from <a href="https://ioda.inetintel.cc.gatech.edu" target="_blank">IODA</a>
+  </figcaption>
 </figure>

@@ -29,8 +29,9 @@ Rails.application.configure do
     }
   else
     config.action_controller.perform_caching = false
-
-    config.cache_store = :null_store
+    # NB: not :null_store — the internet monitors rely on Rails.cache as their
+    # in-process snapshot store even when HTTP/fragment caching is disabled.
+    config.cache_store = :memory_store
   end
 
   # Print deprecation notices to the Rails logger.

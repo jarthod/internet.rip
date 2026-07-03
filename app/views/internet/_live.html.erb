@@ -1,0 +1,156 @@
+<%
+  # Overall internet health, derived from the individual monitors.
+  problems = []
+  problems << "#{@root.data[:total] - @root.data[:up]} root server(s) down" if @root.ok? && @root.data && @root.data[:up] < @root.data[:total]
+  if @services.ok? && @services.data
+    bad = @services.data.count { %w[major critical].include?(_1[:indicator]) }
+    problems << "#{bad} service(s) degraded" if bad > 0
+  end
+  problems << "#{@sites.data[:total] - @sites.data[:up]} site(s) unreachable" if @sites.ok? && @sites.data && @sites.data[:up] < @sites.data[:total]
+  problems << "#{@outages.data[:count]} country outage(s)" if @outages.ok? && @outages.data && @outages.data[:count] > 0
+  problems << "#{@tlds.data[:problems].size} TLD(s) degraded" if @tlds.ok? && @tlds.data && @tlds.data[:problems].any?
+  any_loading = [@root, @services, @sites, @outages].any?(&:loading?)
+  overall = problems.any? ? "down" : (any_loading ? "unknown" : "ok")
+
+  # Countries highlighted on the map by their ISO-2 <path> class: from IODA
+  # connectivity outages, plus ccTLDs whose DNS (per DNSMON) is degraded.
+  outage_countries = (@outages.data && @outages.data[:countries] || [])
+  tld_problems = (@tlds.data && @tlds.data[:problems]) || []
+  severe = outage_countries.select { _1[:severe] }.map { _1[:code] } +
+           tld_problems.select { _1[:status] == "down" }.map { _1[:cc] }
+  minor  = outage_countries.reject { _1[:severe] }.map { _1[:code] } +
+           tld_problems.select { _1[:status] == "warn" }.map { _1[:cc] }
+  # Sanitise to valid two-letter selectors; severe wins over minor.
+  severe = severe.compact.select { _1.match?(/\A[A-Z]{2}\z/) }.uniq
+  minor  = (minor.compact.select { _1.match?(/\A[A-Z]{2}\z/) }.uniq - severe)
+%>
+
+<%# Highlight outage countries directly on the (static) base map. %>
+<style>
+  <%= ".#{severe.join(', .')} { fill: var(--down-color) !important; }".html_safe if severe.any? %>
+  <%= ".#{minor.join(', .')} { fill: var(--warn-color) !important; }".html_safe if minor.any? %>
+</style>
+
+<%# Overall status banner %>
+<header class="status-banner status-<%= overall %>">
+  <span class="dot"></span>
+  <span class="label">
+    <% if overall == "ok" %>All monitored systems nominal
+    <% elsif overall == "unknown" %>Collecting telemetry&hellip;
+    <% else %><%= problems.join(" · ") %><% end %>
+  </span>
+  <time class="clock" datetime="<%= Time.current.iso8601 %>"><%= Time.current.utc.strftime("%H:%M:%S UTC") %></time>
+</header>
+
+<div class="panels">
+ <div class="panel-col">
+  <%# DNS root servers (measured by RIPE Atlas) %>
+  <section class="panel">
+    <h2>DNS Root Servers <small class="sub">DNSMON</small>
+      <% if @root.ok? && @root.data %><span class="count"><%= @root.data[:up] %>/<%= @root.data[:total] %></span><% end %>
+    </h2>
+    <% if @root.loading? %>
+      <p class="loading">loading DNSMON&hellip;</p>
+    <% else %>
+      <ul class="root-list">
+        <% @root.data[:servers].each do |s| %>
+          <li class="<%= s[:up] ? "ok" : (s[:avail].to_i.positive? ? "warn" : "down") %>">
+            <a href="<%= s[:url] %>" target="_blank" title="<%= s[:letter].upcase %>-root · <%= s[:avail] %>% queries answered (RIPE DNSMON)">
+              <span class="rletter"><%= s[:letter].upcase %></span>
+              <%= sparkline(s[:spark]) %>
+              <span class="rms"><%= s[:median] ? "#{s[:median].round}ms" : "—" %></span>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# Service status pages %>
+  <section class="panel">
+    <h2>Services</h2>
+    <% if @services.loading? %>
+      <p class="loading">loading&hellip;</p>
+    <% else %>
+      <ul class="status-list">
+        <% @services.data.each do |svc| %>
+          <li>
+            <span class="dot <%= status_class(svc[:indicator]) %>"></span>
+            <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
+            <span class="detail"><%= svc[:description] || svc[:indicator] %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+ </div>
+
+ <div class="panel-col">
+  <%# Global connectivity outages (IODA) %>
+  <section class="panel">
+    <h2>Connectivity Outages
+      <% if @outages.ok? && @outages.data %><span class="count"><%= @outages.data[:count] %></span><% end %>
+    </h2>
+    <% if @outages.loading? %>
+      <p class="loading">loading&hellip;</p>
+    <% elsif @outages.data[:countries].empty? %>
+      <p class="loading">no country-level outages</p>
+    <% else %>
+      <ul class="status-list outages">
+        <% @outages.data[:countries].first(8).each do |c| %>
+          <li>
+            <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
+            <a class="cc" href="<%= c[:url] %>" target="_blank"><%= c[:code] %></a>
+            <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
+          </li>
+        <% end %>
+      </ul>
+      <p class="source">via <a href="https://ioda.inetintel.cc.gatech.edu" target="_blank">IODA</a> · 24h</p>
+    <% end %>
+  </section>
+
+  <%# ccTLD / gTLD name servers (RIPE DNSMON, sampled on rotation) %>
+  <section class="panel">
+    <h2>TLD Name Servers <small class="sub">DNSMON</small>
+      <% if @tlds.ok? && @tlds.data && @tlds.data[:checked] > 0 %><span class="count"><%= @tlds.data[:ok] %>/<%= @tlds.data[:checked] %></span><% end %>
+    </h2>
+    <% if @tlds.loading? || @tlds.data.nil? || @tlds.data[:checked] == 0 %>
+      <p class="loading">sampling DNSMON zones&hellip;</p>
+    <% else %>
+      <% if @tlds.data[:problems].any? %>
+        <ul class="status-list tld-list">
+          <% @tlds.data[:problems].first(6).each do |t| %>
+            <li>
+              <span class="dot <%= t[:status] %>"></span>
+              <a href="<%= t[:url] %>" target="_blank" title="<%= t[:cc] %>">.<%= t[:name] %></a>
+              <%= sparkline(t[:spark]) %>
+              <span class="detail"><%= t[:avail] %>%</span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="loading">all sampled zones nominal</p>
+      <% end %>
+      <p class="source"><%= @tlds.data[:checked] %>/<%= @tlds.data[:total] %> zones sampled · rotating</p>
+    <% end %>
+  </section>
+
+  <%# Public site reachability %>
+  <section class="panel">
+    <h2>Reachability</h2>
+    <% if @sites.loading? %>
+      <p class="loading">pinging&hellip;</p>
+    <% else %>
+      <ul class="status-list">
+        <% @sites.data[:sites].each do |site| %>
+          <li>
+            <span class="dot <%= status_class(site[:up]) %>"></span>
+            <a href="<%= site[:url] %>" target="_blank"><%= site[:name] %></a>
+            <span class="detail"><%= site[:up] ? "#{site[:ms]}ms" : (site[:error] || "down") %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+ </div>
+</div>

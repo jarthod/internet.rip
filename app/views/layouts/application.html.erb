@@ -1,19 +1,43 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Internet.RIP</title>
+    <title>Internet.RIP — status page of the internet</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="A high-level status page for the internet: DNS root servers, major services, reachability and world events on a live map.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-    <%# javascript_importmap_tags(shim: false) %>
   </head>
 
   <body>
-    <header>
+    <header class="site-header">
       <h1>(×_×) Internet.RIP<blink>_</blink></h1>
     </header>
     <%= yield %>
+
+    <script>
+      // Poll the live layer and swap it in, so the heavy base map is untouched.
+      (function () {
+        var live = document.getElementById("live");
+        if (!live) return;
+        var url = live.dataset.refreshUrl;
+
+        async function refresh() {
+          try {
+            var res = await fetch(url, { headers: { "X-Requested-With": "fetch" } });
+            if (res.ok) live.innerHTML = await res.text();
+          } catch (e) { /* offline: keep showing the last snapshot */ }
+        }
+        setInterval(refresh, 12000);
+
+        // Tick the clock locally between refreshes for a live feel.
+        setInterval(function () {
+          var clock = live.querySelector(".clock");
+          if (clock) clock.textContent = new Date().toISOString().substr(11, 8) + " UTC";
+        }, 1000);
+      })();
+    </script>
   </body>
 </html>

@@ -52,6 +52,72 @@ module InternetHelper
     tag.line(x1: x1, y1: y1, x2: x2, y2: y2, **args)
   end
 
+  # --- Plotting geographic data on the map ----------------------------------
+
+  # Project a lat/lng and draw a circle there (used for markers & infra dots).
+  def geo_circle lat, lng, r, **attrs
+    x, y = robinson_svg(lat, lng)
+    tag.circle(cx: x, cy: y, r: r, **attrs)
+  end
+
+  # A dense, static layer of faint infrastructure dots (IXPs, cable landings).
+  # Rendered once with the base map, so we build the markup directly for speed.
+  def infra_layer points, r:, css_class:
+    tag.g(class: css_class) do
+      points.map { |p| geo_circle(p[:lat], p[:lng], r) }.join.html_safe
+    end
+  end
+
+  # Static layer of submarine cable routes. Each cable is a MultiLineString;
+  # segments are split again wherever they cross the ±180° antimeridian so the
+  # projection doesn't draw a stray line straight across the map.
+  def cables_layer cables
+    tag.g(class: "cables") do
+      cables.flat_map { |cable| cable[:segments] }.map do |segment|
+        antimeridian_split(segment).map do |part|
+          next if part.size < 2
+
+          polyline(part.map { |lat, lng| robinson_svg(lat, lng) })
+        end.join
+      end.join.html_safe
+    end
+  end
+
+  # Split a [lat, lng] path at antimeridian jumps (|Δlng| > 180°).
+  def antimeridian_split segment
+    segment.slice_when { |(_, lng1), (_, lng2)| (lng1 - lng2).abs > 180 }.to_a
+  end
+
+  # A tiny inline SVG sparkline from a series of numbers. The y-axis is baselined
+  # at zero (with a little headroom) rather than at the series minimum, so a
+  # stable series reads as a flat line and only real spikes stand out — instead
+  # of amplifying tiny fluctuations to fill the whole box.
+  def sparkline values, width: 46, height: 14, **attrs
+    values = Array(values).compact
+    return tag.span("", class: "spark-empty") if values.size < 2
+
+    max = (values.max * 1.15).nonzero? || 1
+    step = width.to_f / (values.size - 1)
+    points = values.each_with_index.map do |v, i|
+      x = (i * step).round(1)
+      y = (height - 1 - v / max * (height - 2)).round(1)
+      "#{x},#{y}"
+    end
+    tag.svg(viewBox: "0 0 #{width} #{height}", class: "spark", **attrs) do
+      tag.polyline(points: points.join(" "), fill: "none")
+    end
+  end
+
+  # CSS status class for a statuspage indicator or an up/down boolean.
+  def status_class indicator
+    case indicator.to_s
+    when "none", "true"        then "ok"
+    when "minor"               then "warn"
+    when "major", "critical", "false" then "down"
+    else "unknown"
+    end
+  end
+
   def text x, y, body, fill: 'white', **args
     tag.text(body, x: x, y: y, fill: fill, stroke: 'none', 'font-size': '12', **args)
   end

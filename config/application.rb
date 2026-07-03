@@ -1,4 +1,4 @@
-require_relative "boot"
+  require_relative "boot"
 
 require "rails"
 # Pick the frameworks you want:
@@ -27,6 +27,10 @@ module InternetRip
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
+
+    # Monitors cache their results in-process, so we need a real cache store in
+    # every environment (the default NullStore in development would disable it).
+    config.cache_store = :memory_store
 
     # Configuration for the application, engines, and railties goes here.
     #

@@ -93,12 +93,6 @@ class TldMonitor < BaseMonitor
     downsample(series, SPARK_POINTS)
   end
 
-  def downsample(values, n)
-    return values if values.size <= n
-
-    values.each_slice((values.size.to_f / n).ceil).map { |s| (s.sum / s.size).round(1) }
-  end
-
   # The ccTLD/gTLD zones DNSMON tracks (excluding the root and e164.arpa zones).
   def zone_ids
     groups = get_json(GROUPS, timeout: 8)["groups"]

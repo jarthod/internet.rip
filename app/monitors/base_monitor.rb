@@ -135,6 +135,14 @@ class BaseMonitor
     items.map { |item| Thread.new { block.call(item) } }.map(&:value)
   end
 
+  # Reduce a series to at most `n` points by averaging consecutive slices. Used
+  # by monitors that show a sparkline from a long raw series.
+  def downsample(values, n)
+    return values if values.size <= n
+
+    values.each_slice((values.size.to_f / n).ceil).map { |s| (s.sum / s.size).round(1) }
+  end
+
   private
 
   def monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC)

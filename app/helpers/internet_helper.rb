@@ -108,6 +108,14 @@ module InternetHelper
     end
   end
 
+  # A "via <source>[· extra]" attribution footer, used under panels that cite
+  # an upstream data source.
+  def source_line(name, url: nil, extra: nil)
+    parts = ["via ", url ? link_to(name, url, target: "_blank") : name]
+    parts += [" · ", extra] if extra
+    tag.p(safe_join(parts), class: "source")
+  end
+
   # CSS status class for a statuspage indicator or an up/down boolean.
   def status_class indicator
     case indicator.to_s

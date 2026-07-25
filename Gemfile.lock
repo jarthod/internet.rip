@@ -249,6 +249,7 @@ DEPENDENCIES
   debug
   error_highlight (>= 0.4.0)
   importmap-rails
+  nokogiri
   propshaft
   puma (>= 5.0)
   rails (~> 8.1.0)

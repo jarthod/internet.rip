@@ -46,7 +46,7 @@
  <div class="panel-col">
   <%# DNS root servers (measured by RIPE Atlas) %>
   <section class="panel">
-    <h2>DNS Root Servers <small class="sub">DNSMON</small>
+    <h2>DNS Root Servers
       <% if @root.ok? && @root.data %><span class="count"><%= @root.data[:up] %>/<%= @root.data[:total] %></span><% end %>
     </h2>
     <% if @root.loading? %>
@@ -63,12 +63,13 @@
           </li>
         <% end %>
       </ul>
+      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/") %>
     <% end %>
   </section>
 
   <%# Service status pages %>
   <section class="panel">
-    <h2>Services</h2>
+    <h2>Major Hosting Services</h2>
     <% if @services.loading? %>
       <p class="loading">loading&hellip;</p>
     <% else %>
@@ -100,18 +101,19 @@
         <% @outages.data[:countries].first(8).each do |c| %>
           <li>
             <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
-            <a class="cc" href="<%= c[:url] %>" target="_blank"><%= c[:code] %></a>
             <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
+            <% if c[:spark] %><%= sparkline(c[:spark]) %><% end %>
+            <% if c[:reason] %><span class="detail"><%= c[:reason] %></span><% end %>
           </li>
         <% end %>
       </ul>
-      <p class="source">via <a href="https://ioda.inetintel.cc.gatech.edu" target="_blank">IODA</a> · 24h</p>
+      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h") %>
     <% end %>
   </section>
 
   <%# ccTLD / gTLD name servers (RIPE DNSMON, sampled on rotation) %>
   <section class="panel">
-    <h2>TLD Name Servers <small class="sub">DNSMON</small>
+    <h2>TLD Name Servers
       <% if @tlds.ok? && @tlds.data && @tlds.data[:checked] > 0 %><span class="count"><%= @tlds.data[:ok] %>/<%= @tlds.data[:checked] %></span><% end %>
     </h2>
     <% if @tlds.loading? || @tlds.data.nil? || @tlds.data[:checked] == 0 %>
@@ -131,7 +133,7 @@
       <% else %>
         <p class="loading">all sampled zones nominal</p>
       <% end %>
-      <p class="source"><%= @tlds.data[:checked] %>/<%= @tlds.data[:total] %> zones sampled · rotating</p>
+      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/", extra: "#{@tlds.data[:checked]}/#{@tlds.data[:total]} zones sampled · rotating") %>
     <% end %>
   </section>
 

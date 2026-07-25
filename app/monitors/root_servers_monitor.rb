@@ -12,7 +12,7 @@ class RootServersMonitor < BaseMonitor
 
   API = "https://dnsmon.ripe.net/api/servers?group=root".freeze
   SPARK_POINTS = 48 # downsample the ~24h series to keep the sparkline crisp
-  UP_THRESHOLD = 95 # % of queries answered for a "green" root
+  UP_THRESHOLD = 75 # % of queries answered for a "green" root (down only below ~25% failure)
 
   def fetch
     json = get_json(API, timeout: 12)
@@ -41,12 +41,5 @@ class RootServersMonitor < BaseMonitor
       spark: spark,
       url: server.dig("atlas_measurements", 0, "overview_url") || "https://dnsmon.ripe.net/",
     }
-  end
-
-  # Reduce a series to at most `n` points by averaging consecutive slices.
-  def downsample(values, n)
-    return values if values.size <= n
-
-    values.each_slice((values.size.to_f / n).ceil).map { |s| (s.sum / s.size).round(1) }
   end
 end

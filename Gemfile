@@ -7,6 +7,7 @@ gem "propshaft"
 gem "sqlite3", "~> 2.1"
 gem "puma", ">= 5.0"
 gem "importmap-rails"
+gem "nokogiri"
 # gem "turbo-rails"
 gem "bootsnap", require: false
 

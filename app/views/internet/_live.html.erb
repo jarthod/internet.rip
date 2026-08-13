@@ -2,6 +2,7 @@
   # Overall internet health, derived from the individual monitors.
   problems = []
   problems << "#{@root.data[:total] - @root.data[:up]} root server(s) down" if @root.ok? && @root.data && @root.data[:up] < @root.data[:total]
+  problems << "#{@resolvers.data[:total] - @resolvers.data[:up]} public DNS resolver(s) down" if @resolvers.ok? && @resolvers.data && @resolvers.data[:up] < @resolvers.data[:total]
   if @services.ok? && @services.data
     bad = @services.data.count { %w[major critical].include?(_1[:indicator]) }
     problems << "#{bad} service(s) degraded" if bad > 0
@@ -9,7 +10,7 @@
   problems << "#{@sites.data[:total] - @sites.data[:up]} site(s) unreachable" if @sites.ok? && @sites.data && @sites.data[:up] < @sites.data[:total]
   problems << "#{@outages.data[:count]} country outage(s)" if @outages.ok? && @outages.data && @outages.data[:count] > 0
   problems << "#{@tlds.data[:problems].size} TLD(s) degraded" if @tlds.ok? && @tlds.data && @tlds.data[:problems].any?
-  any_loading = [@root, @services, @sites, @outages].any?(&:loading?)
+  any_loading = [@root, @services, @sites, @outages, @resolvers].any?(&:loading?)
   overall = problems.any? ? "down" : (any_loading ? "unknown" : "ok")
 
   # Countries highlighted on the map by their ISO-2 <path> class: from IODA
@@ -23,6 +24,22 @@
   # Sanitise to valid two-letter selectors; severe wins over minor.
   severe = severe.compact.select { _1.match?(/\A[A-Z]{2}\z/) }.uniq
   minor  = (minor.compact.select { _1.match?(/\A[A-Z]{2}\z/) }.uniq - severe)
+  flagged = severe + minor
+
+  # Per-flagged-country name + issue list, for a native hover tooltip on the
+  # map. Scoped to countries already flagged above (rather than all ~190) —
+  # an unaffected country would have nothing worth saying anyway.
+  country_info = {}
+  outage_countries.each do |c|
+    next unless flagged.include?(c[:code])
+    entry = (country_info[c[:code]] ||= { name: c[:name], lines: [] })
+    entry[:lines] << "#{c[:severe] ? "Severe" : "Partial"} connectivity outage#{" — #{c[:reason]}" if c[:reason]} (IODA)"
+  end
+  tld_problems.each do |t|
+    next unless flagged.include?(t[:cc])
+    entry = (country_info[t[:cc]] ||= { name: ISO3166::Country.new(t[:cc])&.common_name || t[:cc], lines: [] })
+    entry[:lines] << ".#{t[:name]} ccTLD degraded — #{t[:avail]}% queries answered (DNSMON)"
+  end
 %>
 
 <%# Highlight outage countries directly on the (static) base map. %>
@@ -30,6 +47,13 @@
   <%= ".#{severe.join(', .')} { fill: var(--down-color) !important; }".html_safe if severe.any? %>
   <%= ".#{minor.join(', .')} { fill: var(--warn-color) !important; }".html_safe if minor.any? %>
 </style>
+
+<%# Data island read by the poller script (app/views/layouts/application.html.erb)
+    to (re)attach native SVG <title> tooltips to the base map's country paths
+    after each refresh — a <script> swapped in via innerHTML never executes,
+    but its text content is still readable, so the tooltip logic lives in the
+    layout's persistent poller instead. %>
+<script type="application/json" id="country-issues"><%= country_info.to_json.gsub("</", '<\/').html_safe %></script>
 
 <%# Overall status banner %>
 <header class="status-banner status-<%= overall %>">
@@ -43,7 +67,7 @@
 </header>
 
 <div class="panels">
- <div class="panel-col">
+ <div class="panel-row top">
   <%# DNS root servers (measured by RIPE Atlas) %>
   <section class="panel">
     <h2>DNS Root Servers
@@ -55,38 +79,72 @@
       <ul class="root-list">
         <% @root.data[:servers].each do |s| %>
           <li class="<%= s[:up] ? "ok" : (s[:avail].to_i.positive? ? "warn" : "down") %>">
-            <a href="<%= s[:url] %>" target="_blank" title="<%= s[:letter].upcase %>-root · <%= s[:avail] %>% queries answered (RIPE DNSMON)">
+            <a href="<%= s[:url] %>" target="_blank" title="<%= s[:letter].upcase %>-root (RIPE DNSMON)">
               <span class="rletter"><%= s[:letter].upcase %></span>
               <%= sparkline(s[:spark]) %>
-              <span class="rms"><%= s[:median] ? "#{s[:median].round}ms" : "—" %></span>
+              <span class="rms"><%= s[:median] ? "#{s[:median].round}ms" : "—" %> &middot; <%= s[:avail] || "—" %>%</span>
             </a>
           </li>
         <% end %>
       </ul>
-      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/") %>
+      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/", extra: "24h") %>
     <% end %>
   </section>
 
-  <%# Service status pages %>
+  <%# ccTLD / gTLD name servers (RIPE DNSMON, sampled on rotation) %>
   <section class="panel">
-    <h2>Major Hosting Services</h2>
-    <% if @services.loading? %>
+    <h2>TLD Name Servers
+      <% if @tlds.ok? && @tlds.data && @tlds.data[:checked] > 0 %><span class="count"><%= @tlds.data[:ok] %>/<%= @tlds.data[:checked] %></span><% end %>
+    </h2>
+    <% if @tlds.loading? || @tlds.data.nil? || @tlds.data[:checked] == 0 %>
+      <p class="loading">sampling DNSMON zones&hellip;</p>
+    <% else %>
+      <% if @tlds.data[:problems].any? %>
+        <ul class="status-list tld-list">
+          <% @tlds.data[:problems].first(6).each do |t| %>
+            <li>
+              <span class="dot <%= t[:status] %>"></span>
+              <a href="<%= t[:url] %>" target="_blank" title="<%= t[:cc] %>">.<%= t[:name] %></a>
+              <%= sparkline(t[:spark]) %>
+              <span class="detail"><%= t[:median] ? "#{t[:median].round}ms &middot; ".html_safe : "" %><%= t[:avail] %>%</span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="loading">all sampled zones nominal</p>
+      <% end %>
+      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/", extra: "#{@tlds.data[:checked]}/#{@tlds.data[:total]} zones sampled &middot; rotating &middot; 24h".html_safe) %>
+    <% end %>
+  </section>
+
+  <%# Public recursive DNS resolvers — latency/uptime aggregated by PerfOps/DNSPerf
+      from 200+ global vantage points (see PublicResolversMonitor for why that
+      beats probing from just this one server). %>
+  <section class="panel">
+    <h2>Public DNS Resolvers
+      <% if @resolvers.ok? && @resolvers.data %><span class="count"><%= @resolvers.data[:up] %>/<%= @resolvers.data[:total] %></span><% end %>
+    </h2>
+    <% if @resolvers.loading? %>
       <p class="loading">loading&hellip;</p>
     <% else %>
-      <ul class="status-list services">
-        <% @services.data.each do |svc| %>
+      <ul class="status-list resolvers">
+        <% @resolvers.data[:resolvers].each do |r| %>
           <li>
-            <span class="dot <%= status_class(svc[:indicator]) %>"></span>
-            <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
-            <span class="detail"><%= svc[:indicator] == "none" ? "Operational" : (svc[:description].presence || svc[:indicator]) %></span>
+            <span class="dot <%= r[:status] %>"></span>
+            <a href="<%= r[:url] %>" target="_blank" title="mean query time today (partial day) · dot colour is the 30-day uptime: &ge;98% ok, &ge;95% warn">
+              <%= r[:name] %>
+            </a>
+            <%= sparkline(r[:spark]) %>
+            <span class="detail"><%= r[:ms] ? "#{r[:ms]}ms &middot; #{r[:uptime]}%".html_safe : (r[:error] || "no data") %></span>
           </li>
         <% end %>
       </ul>
+      <%= source_line("DNSPerf", url: "https://www.dnsperf.com/#!dns-resolvers", extra: "30d") %>
     <% end %>
   </section>
  </div>
 
- <div class="panel-col">
+ <div class="panel-row bottom">
   <%# Global connectivity outages (IODA) %>
   <section class="panel">
     <h2>Connectivity Outages
@@ -111,29 +169,44 @@
     <% end %>
   </section>
 
-  <%# ccTLD / gTLD name servers (RIPE DNSMON, sampled on rotation) %>
+  <%# Service status pages %>
   <section class="panel">
-    <h2>TLD Name Servers
-      <% if @tlds.ok? && @tlds.data && @tlds.data[:checked] > 0 %><span class="count"><%= @tlds.data[:ok] %>/<%= @tlds.data[:checked] %></span><% end %>
-    </h2>
-    <% if @tlds.loading? || @tlds.data.nil? || @tlds.data[:checked] == 0 %>
-      <p class="loading">sampling DNSMON zones&hellip;</p>
+    <h2>Major Hosting Services</h2>
+    <% if @services.loading? %>
+      <p class="loading">loading&hellip;</p>
     <% else %>
-      <% if @tlds.data[:problems].any? %>
-        <ul class="status-list tld-list">
-          <% @tlds.data[:problems].first(6).each do |t| %>
-            <li>
-              <span class="dot <%= t[:status] %>"></span>
-              <a href="<%= t[:url] %>" target="_blank" title="<%= t[:cc] %>">.<%= t[:name] %></a>
-              <%= sparkline(t[:spark]) %>
-              <span class="detail"><%= t[:avail] %>%</span>
-            </li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p class="loading">all sampled zones nominal</p>
-      <% end %>
-      <%= source_line("DNSMON", url: "https://dnsmon.ripe.net/", extra: "#{@tlds.data[:checked]}/#{@tlds.data[:total]} zones sampled · rotating") %>
+      <ul class="status-list services">
+        <% @services.data.each do |svc| %>
+          <li>
+            <span class="dot <%= status_class(svc[:indicator]) %>"></span>
+            <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
+            <span class="detail"><%= svc[:indicator] == "none" ? "Operational" : (svc[:description].presence || svc[:indicator]) %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# BGP routing anomalies (GRIP): a feed to skim, not a health signal — see
+      GripMonitor for why it doesn't factor into the overall status banner. %>
+  <section class="panel">
+    <h2>Possible Routing Anomalies</h2>
+    <% if @grip.loading? %>
+      <p class="loading">loading&hellip;</p>
+    <% elsif @grip.data[:events].empty? %>
+      <p class="loading">no notable events</p>
+    <% else %>
+      <ul class="status-list anomalies">
+        <% @grip.data[:events].first(6).each do |ev| %>
+          <% tooltip = [ev[:label], ev[:prefixes].join(", "), ev[:explanation], ev[:countries].any? ? "ASes: #{ev[:countries].join(', ')}" : nil].compact.join(" · ") %>
+          <li>
+            <span class="dot <%= ev[:finished_at] ? "unknown" : "warn" %>"></span>
+            <a href="<%= ev[:url] %>" target="_blank" title="<%= tooltip %>"><%= ev[:prefixes].join(", ") %></a>
+            <span class="detail"><%= ev[:finished_at] ? "resolved #{compact_duration(Time.current - ev[:finished_at])} ago" : "ongoing #{compact_duration(Time.current - ev[:time])}" %></span>
+          </li>
+        <% end %>
+      </ul>
+      <%= source_line("GRIP", url: "https://grip.inetintel.cc.gatech.edu", extra: "suspicion &ge; 80 &middot; 24h".html_safe) %>
     <% end %>
   </section>
 

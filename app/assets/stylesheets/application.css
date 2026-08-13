@@ -11,6 +11,7 @@
   --bg-color: hsl(var(--theme-color), 20%, 10%);
   --text-color: hsl(var(--theme-color), 70%, 85%);
   --dim-color: hsl(var(--theme-color), 20%, 60%);
+  --map-color: hsl(var(--theme-color), 15%, 40%);
 
   --link-color: hsl(var(--accent-color), 70%, 80%);
   --link-underline-color: hsla(var(--accent-color), 70%, 80%, 0.5);
@@ -94,8 +95,8 @@ figure.map > svg:not(.grid),
   fill: var(--basemap-fill);
 }
 
-/* Country shapes are <path>s; infra/overlay layers use <circle>s. */
-figure.map > svg:not(.grid):not(.infra):not(.overlay) path:hover { fill: var(--dim-color); }
+svg[baseprofile="tiny"] path { fill: var(--map-color); }
+svg[baseprofile="tiny"] path:hover { fill: var(--dim-color); }
 
 /* Too small to see otherwise (base map quirks) */
 .PF { stroke: var(--basemap-fill); }
@@ -114,7 +115,7 @@ svg.cables-layer { pointer-events: none; }
 }
 
 /* Smoothly animate the fill when IODA flags/clears a country outage. */
-figure.map path { transition: fill 0.6s ease; }
+figure.map path { transition: fill 0.2s ease; }
 
 /* --- Status banner ------------------------------------------------------ */
 .status-banner {
@@ -141,26 +142,30 @@ figure.map path { transition: fill 0.6s ease; }
 .status-banner .clock { color: var(--dim-color); }
 
 /* --- Panels ------------------------------------------------------------- */
+/* The base map is wide and short (viewBox ~2.33:1), so on most windows there's
+   more spare room above and below it than to its sides. Panels sit in a top
+   row and a bottom row rather than side columns, and stretch to share the
+   full row width — much roomier than the old fixed 20em side columns. */
 .panels {
   position: absolute;
   inset: 3.2em 0.8em 2em;
   z-index: 5;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
-  align-items: flex-start;
   pointer-events: none;
 }
-.panel-col {
+.panel-row {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 0.8em;
-  width: 20em;
 }
 .panel {
-  width: 100%;
-  max-height: 44vh;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 32em;
+  max-height: 34vh;
   overflow: auto;
-  margin-bottom: 0.8em;
   padding: 0.6em 0.8em;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -224,6 +229,13 @@ figure.map path { transition: fill 0.6s ease; }
 .status-list.outages .spark { flex: none; }
 .status-list.outages .detail { max-width: 8em; }
 .status-list.outages a:hover { text-decoration: underline; }
+
+.status-list.anomalies li a { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-list.anomalies .detail { margin-left: 0.5em; max-width: none; }
+
+.status-list.resolvers li a { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-list.resolvers .spark { flex: none; }
+.status-list.resolvers .detail { margin-left: 0.5em; max-width: none; }
 
 /* Root servers: one status-coloured letter + latency sparkline per root */
 .root-list { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 1em; }

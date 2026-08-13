@@ -61,12 +61,23 @@ class TldMonitor < BaseMonitor
       name: unicode_name(json.dig("group", "label"), zone),
       cc: COUNTRY[zone] || (zone.match?(/\A[a-z]{2}\z/) && zone != "eu" ? zone.upcase : nil),
       avail: avail.round(1),
+      median: median_rtt(servers),
       servers: avails.size,
       status: avail >= 98 ? "ok" : (avail >= 90 ? "warn" : "down"),
       spark: availability_series(servers),
       checked_at: Time.current,
       url: "https://dnsmon.ripe.net/#{zone}",
     }
+  end
+
+  # Median RTT across the zone's name servers, from each one's latest bucket
+  # with traffic — same reading RootServersMonitor shows per root letter.
+  def median_rtt(servers)
+    medians = servers.filter_map do |s|
+      latest = Array(s["results"]).reverse.find { _1["queries"].to_i.positive? }
+      latest && latest["rtt50"]
+    end
+    medians.any? ? (medians.sum / medians.size).round(1) : nil
   end
 
   # DNSMON labels IDN zones as "<unicode>. (<punycode>.)"; take the unicode part.

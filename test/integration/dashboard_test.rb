@@ -19,7 +19,7 @@ class DashboardTest < ActionDispatch::IntegrationTest
     seed PublicSitesMonitor,
       { sites: [{ name: "Google", url: "https://google.com", up: true, code: 200, ms: 80, error: nil }],
         up: 1, total: 1 }
-    tld_de = { zone: "de", tld: "de", name: "de", cc: "DE", avail: 78.0, servers: 6,
+    tld_de = { zone: "de", tld: "de", name: "de", cc: "DE", avail: 78.0, median: 22.4, servers: 6,
                status: "down", spark: [80, 79, 78, 77, 78], checked_at: Time.current,
                url: "https://dnsmon.ripe.net/de" }
     seed TldMonitor,
@@ -28,6 +28,22 @@ class DashboardTest < ActionDispatch::IntegrationTest
       { countries: [{ code: "BZ", name: "Belize", score: 500_000, events: 1, severe: true,
                       url: "https://ioda.inetintel.cc.gatech.edu/country/BZ" }],
         count: 1 }
+    seed GripMonitor,
+      { events: [
+          { id: "moas-1-1_2", label: "possible hijack", time: Time.current,
+            finished_at: nil, explanation: "test", suspicion: 80, prefixes: ["1.2.3.0/24"],
+            countries: %w[US], url: "https://grip.inetintel.cc.gatech.edu/v1/events/moas/moas-1-1_2" },
+          { id: "moas-3-3_4", label: "possible hijack", time: 1.hour.ago,
+            finished_at: 30.minutes.ago, explanation: "test", suspicion: 80, prefixes: ["5.6.7.0/24"],
+            countries: %w[FR], url: "https://grip.inetintel.cc.gatech.edu/v1/events/moas/moas-3-3_4" },
+        ] }
+    seed PublicResolversMonitor,
+      { resolvers: [
+          { name: "Cloudflare", url: "https://1.1.1.1/", status: "ok",
+            ms: 8, uptime: 99.98, spark: [8, 9, 7, 8] },
+          { name: "Google", url: "https://developers.google.com/speed/public-dns",
+            status: "down", ms: 40, uptime: 92.1, spark: [10, 11, 40] },
+        ], up: 1, total: 2 }
   end
 
   test "the dashboard renders with the map and all panels" do
@@ -48,6 +64,20 @@ class DashboardTest < ActionDispatch::IntegrationTest
     assert_match "GitHub", @response.body
     assert_match "Belize", @response.body
     assert_match ".BZ", @response.body       # outage country highlight style
+    assert_select ".anomalies a[href=?]", "https://grip.inetintel.cc.gatech.edu/v1/events/moas/moas-1-1_2"
+    assert_match "1.2.3.0/24", @response.body     # ongoing BGP anomaly shows its suspect prefix
+    assert_match "resolved", @response.body        # finished BGP anomaly renders without crashing
+    assert_select ".resolvers .spark polyline"                      # resolver latency sparkline
+    assert_select ".resolvers a[href=?]", "https://1.1.1.1/"
+    assert_match "1 public DNS resolver(s) down", @response.body    # down resolver feeds the status banner
+
+    # Flagged-country tooltip data island (applied client-side to the map's
+    # <path> elements; see application.html.erb's poller script).
+    assert_select "script#country-issues", 1
+    tooltip_data = JSON.parse(css_select("script#country-issues").text)
+    assert_equal "Belize", tooltip_data["BZ"]["name"]
+    assert_match "outage", tooltip_data["BZ"]["lines"].join
+    assert_match "ccTLD degraded", tooltip_data["DE"]["lines"].join
   end
 
   test "the live endpoint renders just the dynamic layer" do

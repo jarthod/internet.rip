@@ -44,7 +44,10 @@ class OutagesMonitor < BaseMonitor
 
       {
         code: code,
-        name: e.dig("entity", "name"),
+        # IODA's own entity name is inconsistently formatted ("Cote D
+        # Ivoire", "Korea, Republic of"); ISO3166's common_name reads like a
+        # normal English name ("Côte d'Ivoire", "South Korea").
+        name: ISO3166::Country.new(code)&.common_name || e.dig("entity", "name"),
         score: score,
         events: e["event_cnt"].to_i,
         severe: score >= SEVERE_SCORE,

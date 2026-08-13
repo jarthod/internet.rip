@@ -24,12 +24,36 @@
         if (!live) return;
         var url = live.dataset.refreshUrl;
 
+        // <script>s inserted via innerHTML never execute, so the per-country
+        // tooltip data travels as a JSON island (#country-issues, rendered by
+        // _live.html.erb) instead, and this reattaches native SVG <title>
+        // children to the base map's country paths after every refresh.
+        function applyCountryTooltips() {
+          var script = document.getElementById("country-issues");
+          var data = {};
+          if (script) { try { data = JSON.parse(script.textContent); } catch (e) { /* malformed: skip */ } }
+          document.querySelectorAll("figure.map path[class]").forEach(function (path) {
+            var info = data[path.getAttribute("class")];
+            var title = path.querySelector("title");
+            if (info) {
+              if (!title) {
+                title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                path.insertBefore(title, path.firstChild);
+              }
+              title.textContent = info.lines.length ? info.name + "\n" + info.lines.join("\n") : info.name;
+            } else if (title) {
+              title.remove();
+            }
+          });
+        }
+
         async function refresh() {
           try {
             var res = await fetch(url, { headers: { "X-Requested-With": "fetch" } });
-            if (res.ok) live.innerHTML = await res.text();
+            if (res.ok) { live.innerHTML = await res.text(); applyCountryTooltips(); }
           } catch (e) { /* offline: keep showing the last snapshot */ }
         }
+        applyCountryTooltips(); // the first render's data island is already in the DOM
         setInterval(refresh, 12000);
 
         // Tick the clock locally between refreshes for a live feel.

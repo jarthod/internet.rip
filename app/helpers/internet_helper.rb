@@ -108,6 +108,17 @@ module InternetHelper
     end
   end
 
+  # A short "2h"/"45m"/"3d" duration, for panels tight on width where
+  # `time_ago_in_words`'s "about 2 hours" reads as clutter.
+  def compact_duration(seconds)
+    seconds = seconds.to_i
+    return "#{seconds}s" if seconds < 60
+    return "#{seconds / 60}m" if seconds < 3600
+    return "#{seconds / 3600}h" if seconds < 86400
+
+    "#{seconds / 86400}d"
+  end
+
   # A "via <source>[· extra]" attribution footer, used under panels that cite
   # an upstream data source.
   def source_line(name, url: nil, extra: nil)

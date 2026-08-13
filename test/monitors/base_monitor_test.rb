@@ -52,5 +52,7 @@ class BaseMonitorTest < ActiveSupport::TestCase
   test "every monitor is registered" do
     assert_includes BaseMonitor.registry, RootServersMonitor
     assert_includes BaseMonitor.registry, OutagesMonitor
+    assert_includes BaseMonitor.registry, GripMonitor
+    assert_includes BaseMonitor.registry, PublicResolversMonitor
   end
 end

@@ -16,11 +16,13 @@ class InternetController < ApplicationController
   def load_monitors
     # Read snapshots first: referencing each constant ensures it is autoloaded
     # and registered before we ask the registry to refresh stale ones.
-    @root     = RootServersMonitor.snapshot
-    @tlds     = TldMonitor.snapshot
-    @services = ServiceStatusMonitor.snapshot
-    @sites    = PublicSitesMonitor.snapshot
-    @outages  = OutagesMonitor.snapshot
+    @root      = RootServersMonitor.snapshot
+    @tlds      = TldMonitor.snapshot
+    @services  = ServiceStatusMonitor.snapshot
+    @sites     = PublicSitesMonitor.snapshot
+    @outages   = OutagesMonitor.snapshot
+    @grip      = GripMonitor.snapshot
+    @resolvers = PublicResolversMonitor.snapshot
 
     BaseMonitor.refresh_all_if_stale # non-blocking; page renders from cache
   end

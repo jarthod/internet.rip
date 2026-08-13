@@ -87,16 +87,17 @@ class BaseMonitor
   # --- HTTP / DNS helpers for subclasses ------------------------------------
 
   # GET a URL and parse the JSON body. Raises on failure (caught by refresh!).
-  def get_json(url, timeout: 6)
-    JSON.parse(http_get(url, timeout: timeout).body)
+  def get_json(url, timeout: 6, headers: {})
+    JSON.parse(http_get(url, timeout: timeout, headers: headers).body)
   end
 
-  def http_get(url, timeout: 6)
+  def http_get(url, timeout: 6, headers: {})
     uri = URI(url)
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
                     open_timeout: timeout, read_timeout: timeout) do |http|
       req = Net::HTTP::Get.new(uri)
       req["User-Agent"] = "internet.rip status monitor (+https://internet.rip)"
+      headers.each { |k, v| req[k] = v }
       http.request(req)
     end
   end

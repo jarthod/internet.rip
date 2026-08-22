@@ -28,15 +28,26 @@
     <%= infra_layer(Infrastructure.ixps, r: 1.1, css_class: "ixps") %>
   </svg>
 
+  <%# Shared SVG filters for dynamic overlays. Defined once here (cheap,
+      declarative, no reason to re-render every poll) and referenced by id
+      from _live.html.erb's heatmap layer. %>
+  <svg width="0" height="0">
+    <defs>
+      <filter id="heatmap-blur" x="-200%" y="-200%" width="500%" height="500%">
+        <feGaussianBlur stdDeviation="8" />
+      </filter>
+    </defs>
+  </svg>
+
   <%# Layer 4+: everything that changes over time, polled by dashboard.js %>
   <div id="live" data-refresh-url="<%= live_path %>">
     <%= render "live" %>
   </div>
 
   <figcaption>
-    Map based on <a href="https://simplemaps.com/resources/svg-world" target="_blank">simplemaps.com</a> ·
+    Made by <a href="https://updown.io" target="_blank">updown.io</a> ·
+    map based on <a href="https://simplemaps.com/resources/svg-world" target="_blank">simplemaps.com</a> ·
     IXPs from <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a> ·
-    submarine cables &amp; landings from <a href="https://www.submarinecablemap.com" target="_blank">TeleGeography</a> ·
-    outages from <a href="https://ioda.inetintel.cc.gatech.edu" target="_blank">IODA</a>
+    submarine cables &amp; landings from <a href="https://www.submarinecablemap.com" target="_blank">TeleGeography</a>
   </figcaption>
 </figure>

@@ -22,7 +22,7 @@ class handles everything else:
   snapshot is stale, kicks off a background thread to refresh it. Rendering
   **never blocks on the network**, so the page always loads instantly.
 
-Current sources (all keyless except `PublicResolversMonitor`, see below):
+Current sources (all keyless except `PublicResolversMonitor`/`UpdownMonitor`, see below):
 
 | Monitor | Source |
 | --- | --- |
@@ -33,6 +33,7 @@ Current sources (all keyless except `PublicResolversMonitor`, see below):
 | `OutagesMonitor`       | [IODA](https://ioda.inetintel.cc.gatech.edu) country-level connectivity outages (BGP + active probing + telescope). Affected countries are highlighted on the map by their ISO-2 `<path>` class. |
 | `GripMonitor`          | [GRIP](https://grip.inetintel.cc.gatech.edu) (Georgia Tech) BGP routing anomalies — hijacks, sub-prefix hijacks, route leaks — inferred from RPKI/IRR/AS-relationship heuristics. The background rate of low-grade flags is huge, so this is a recent-events feed at a high suspicion floor, not a health signal; it does not feed the overall status banner. |
 | `PublicResolversMonitor` | Latency + 30-day uptime of well-known public recursive DNS resolvers (Google, Cloudflare, Quad9, OpenDNS) — the servers people's devices actually query, unlike the authoritative root/TLD servers above. Sourced from [PerfOps/DNSPerf](https://www.dnsperf.com/#!dns-resolvers), which tests every provider every minute from 200+ locations worldwide; probing them directly from just this one server was tried first and dropped, since a resolver regionally blocked or rerouted (e.g. OpenDNS in France) reads as "down" from a single vantage point even when it's fine globally. **Needs an API key** — see Credentials below. |
+| `UpdownMonitor`        | Global heatmap of currently-failing [updown.io](https://updown.io) checks (blurred red dots on the map, sized by count), plus a panel of the worst-hit ISPs by 24h failure rate. Backed by a small protected endpoint on updown's own codebase (`InternetRipController`, deliberately kept out of its public Grape API) that pre-aggregates and rounds geo data server-side, excludes checks down for over a week as chronic/abandoned rather than a real-time outage, and drops ISPs below a minimum sample size — so no individual customer's check is ever exposed. Not a health signal for the internet at large — some fraction of any large customer base is always down for reasons unrelated to broader connectivity — so like `GripMonitor` it doesn't feed the overall status banner. **Needs an API key** — see Credentials below. |
 
 Static map geography is loaded once via `app/models/infrastructure.rb` from local
 GeoJSON files, refreshable with **`rake data:update`** (see `lib/tasks/data.rake`):
@@ -73,6 +74,14 @@ perfops:
 
 Without it, that one monitor just shows an error state; every other monitor
 is unaffected.
+
+`UpdownMonitor` needs a shared-secret token matching the one configured on
+the updown.io side (`internet_rip.token` in its own credentials):
+
+```yaml
+updown:
+  token: the_shared_secret
+```
 
 ## World Map
 

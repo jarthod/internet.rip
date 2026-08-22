@@ -44,6 +44,15 @@ class DashboardTest < ActionDispatch::IntegrationTest
           { name: "Google", url: "https://developers.google.com/speed/public-dns",
             status: "down", ms: 40, uptime: 92.1, spark: [10, 11, 40] },
         ], up: 1, total: 2 }
+    seed UpdownMonitor,
+      { points: [
+          { lat: 48.0, lng: 2.0, count: 7 },
+          { lat: 40.0, lng: -74.0, count: 2 },
+        ],
+        top_isps: [
+          { name: "OVH SAS", down: 4, total: 6, rate: 0.667, spark: [0.1, nil, 0.2] },
+        ],
+        total: 100, failing: 9, rate: 0.09 }
   end
 
   test "the dashboard renders with the map and all panels" do
@@ -70,6 +79,13 @@ class DashboardTest < ActionDispatch::IntegrationTest
     assert_select ".resolvers .spark polyline"                      # resolver latency sparkline
     assert_select ".resolvers a[href=?]", "https://1.1.1.1/"
     assert_match "1 public DNS resolver(s) down", @response.body    # down resolver feeds the status banner
+    assert_select "svg.heatmap .heat-down", 2                       # updown.io failing-check heatmap dots
+    assert_select ".status-list.updown .spark polyline"             # per-ISP 24h failure-rate sparkline
+    assert_match "Failed Checks by AS", @response.body
+    assert_match "9.0% failing", @response.body                     # global failure rate badge
+    assert_match "OVH SAS", @response.body
+    banner_text = css_select(".status-banner .label").text
+    assert_no_match(/OVH|updown/i, banner_text) # updown's failures don't feed the overall status banner
 
     # Flagged-country tooltip data island (applied client-side to the map's
     # <path> elements; see application.html.erb's poller script).

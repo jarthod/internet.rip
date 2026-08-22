@@ -60,6 +60,33 @@ module InternetHelper
     tag.circle(cx: x, cy: y, r: r, **attrs)
   end
 
+  # Dot radius for the updown.io failing-checks heatmap, scaled by how many
+  # failing checks are in that bucket. sqrt (not linear) so a handful of
+  # busy hotspots don't dwarf everything else on the map.
+  def heat_radius(count, min: 3, max: 16)
+    [min + Math.sqrt(count) * 1.8, max].min.round(1)
+  end
+
+  # A country's outage-severity fill, from a 0..1 intensity: default map
+  # colour → amber → red, so a barely-flagged country reads as barely
+  # different from an unflagged one instead of jumping straight to full
+  # amber (color-mix itself can't take three stops, hence the two branches).
+  # 0 intensity already starts at 20% amber (so even the lightest flagged
+  # country still shows up against the base map), ramping to pure amber at
+  # AMBER_BAND, then from there on to pure red at full intensity.
+  MIN_SEVERITY_PCT = 20
+  AMBER_BAND = 0.6
+
+  def severity_color(intensity)
+    if intensity <= AMBER_BAND
+      pct = MIN_SEVERITY_PCT + (intensity / AMBER_BAND) * (100 - MIN_SEVERITY_PCT)
+      "color-mix(in srgb, var(--map-color), var(--warn-color) #{pct.round}%)"
+    else
+      pct = (intensity - AMBER_BAND) / (1 - AMBER_BAND) * 100
+      "color-mix(in srgb, var(--warn-color), var(--down-color) #{pct.round}%)"
+    end
+  end
+
   # A dense, static layer of faint infrastructure dots (IXPs, cable landings).
   # Rendered once with the base map, so we build the markup directly for speed.
   def infra_layer points, r:, css_class:
@@ -92,11 +119,15 @@ module InternetHelper
   # at zero (with a little headroom) rather than at the series minimum, so a
   # stable series reads as a flat line and only real spikes stand out — instead
   # of amplifying tiny fluctuations to fill the whole box.
-  def sparkline values, width: 46, height: 14, **attrs
+  #
+  # `ceiling:`, if given, overrides the series' own max as the scale reference
+  # (still with the same headroom) — for a group of sparklines that should
+  # share one y-axis instead of each normalizing independently.
+  def sparkline values, width: 46, height: 14, ceiling: nil, **attrs
     values = Array(values).compact
     return tag.span("", class: "spark-empty") if values.size < 2
 
-    max = (values.max * 1.15).nonzero? || 1
+    max = ((ceiling || values.max) * 1.15).nonzero? || 1
     step = width.to_f / (values.size - 1)
     points = values.each_with_index.map do |v, i|
       x = (i * step).round(1)

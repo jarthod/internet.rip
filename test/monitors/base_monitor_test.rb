@@ -54,5 +54,6 @@ class BaseMonitorTest < ActiveSupport::TestCase
     assert_includes BaseMonitor.registry, OutagesMonitor
     assert_includes BaseMonitor.registry, GripMonitor
     assert_includes BaseMonitor.registry, PublicResolversMonitor
+    assert_includes BaseMonitor.registry, UpdownMonitor
   end
 end

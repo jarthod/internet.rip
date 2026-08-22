@@ -23,6 +23,7 @@ class InternetController < ApplicationController
     @outages   = OutagesMonitor.snapshot
     @grip      = GripMonitor.snapshot
     @resolvers = PublicResolversMonitor.snapshot
+    @updown    = UpdownMonitor.snapshot
 
     BaseMonitor.refresh_all_if_stale # non-blocking; page renders from cache
   end

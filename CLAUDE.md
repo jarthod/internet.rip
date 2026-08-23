@@ -86,6 +86,12 @@ splitting), `infra_layer`.
 - Refresh map data: `rake data:update` (or `data:cables` / `data:landing_points` /
   `data:ixps`).
 
+## Committing
+
+Commit messages: short subject line. A body is fine when it genuinely helps,
+but keep it a couple of lines — not a bullet per file/feature touched. No
+`Co-Authored-By` trailer.
+
 ## Roadmap (from the owner's project notes)
 
 RIPE Atlas, IHR alarm aggregation, per-cable fault status, public-DNS resolver

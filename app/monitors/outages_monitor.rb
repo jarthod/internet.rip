@@ -24,10 +24,6 @@ class OutagesMonitor < BaseMonitor
     "merit-nt"     => "darknet traffic anomaly",
   }.freeze
 
-  SPARK_COUNT  = 8 # matches the view's `.first(8)` — don't fetch spark for rows never shown
-  SPARK_POINTS = 24
-  SIGNALS_API  = "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/%s".freeze
-
   def fetch
     now = Time.now.to_i
     url = "#{API}?from=#{now - WINDOW}&until=#{now}&entityType=country&orderBy=score&limit=25"
@@ -49,30 +45,22 @@ class OutagesMonitor < BaseMonitor
         # normal English name ("Côte d'Ivoire", "South Korea").
         name: ISO3166::Country.new(code)&.common_name || e.dig("entity", "name"),
         score: score,
+        # IODA's raw score has no fixed ceiling of its own; expressed as a
+        # percentage of the "severe" cutoff instead (capped at 100) it reads
+        # as a rough severity gauge instead of an opaque number.
+        pct: [100.0 * score / SEVERE_SCORE, 100.0].min.round,
         events: e["event_cnt"].to_i,
         severe: score >= SEVERE_SCORE,
-        reason: DATASOURCE_LABEL[datasource],
+        # IODA doesn't always break the score down by datasource (no driver
+        # clearly dominant, or a key outside DATASOURCE_LABEL) — fall back to
+        # a generic reason rather than leaving the row with a bare percentage
+        # and no explanation at all.
+        reason: DATASOURCE_LABEL[datasource] || "elevated outage signal",
         datasource: datasource,
         url: "https://ioda.inetintel.cc.gatech.edu/country/#{code}",
       }
     end.sort_by { -_1[:score] }
 
-    top = countries.first(SPARK_COUNT)
-    sparks = in_parallel(top.select { _1[:datasource] }) { |c| [c[:code], fetch_spark(c[:code], c[:datasource])] }.to_h
-    top.each { |c| c[:spark] = sparks[c[:code]] }
-
     { countries: countries, count: countries.size }
-  end
-
-  private
-
-  def fetch_spark(code, datasource)
-    now = Time.now.to_i
-    url = "#{SIGNALS_API % code}?from=#{now - WINDOW}&until=#{now}&datasource=#{datasource}"
-    json = get_json(url, timeout: 8)
-    values = json.dig("data", 0, 0, "values")
-    values && downsample(values.compact, SPARK_POINTS)
-  rescue
-    nil
   end
 end

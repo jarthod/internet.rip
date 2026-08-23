@@ -62,7 +62,7 @@ blink { animation: blink-caret 1s 4 step-end; }
 .site-header h1 {
   margin: 0;
   font-weight: normal;
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 3.2vw + 0.4rem, 1.4rem);
   text-shadow: 3px 0 hsl(var(--theme-color), 60%, 25%);
 }
 
@@ -129,8 +129,7 @@ figure.map path { transition: fill 0.2s ease; }
 .status-banner {
   position: absolute;
   top: 0.6em;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 0.8em;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -140,11 +139,12 @@ figure.map path { transition: fill 0.2s ease; }
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: blur(4px);
-  font-size: 0.85rem;
+  font-size: clamp(0.7rem, 1.8vw + 0.4rem, 0.85rem);
   white-space: nowrap;
 }
 .status-banner .dot { width: 0.7em; height: 0.7em; border-radius: 50%; }
 .status-banner.status-ok .dot      { background: var(--ok-color);   box-shadow: 0 0 6px var(--ok-color); }
+.status-banner.status-warn .dot    { background: var(--warn-color); box-shadow: 0 0 6px var(--warn-color); }
 .status-banner.status-down .dot    { background: var(--down-color); box-shadow: 0 0 6px var(--down-color); }
 .status-banner.status-unknown .dot { background: var(--dim-color); }
 .status-banner .clock { color: var(--dim-color); }
@@ -163,15 +163,27 @@ figure.map path { transition: fill 0.2s ease; }
   justify-content: space-between;
   pointer-events: none;
 }
+/* Back to grid (not flex-wrap): flex-grow's ratio only means anything when
+   multiple items share a line, but every wrap point here can leave a panel
+   alone on its own line — and flex still applies that panel's grow *ratio*
+   even solo, which on a single-column (mobile) row shrank a low-grow panel
+   below the full line width it should always get when it's the only thing
+   on it. Grid's auto-fit has no such per-item weighting (a limitation, not
+   a bug: repeat() requires one shared track-sizing function, so there's no
+   real grid equivalent of differing flex-grow ratios) — every column is an
+   equal 1fr share, but a lone item always gets the *whole* row regardless,
+   which is what actually matters here. auto-fit lets column count fall out
+   of the available width (4 → 3 → 2 → 1) instead of jumping straight from
+   a cramped 4-up to one huge column; stretch (grid's default) equalises
+   every panel's height to the tallest one sharing its row. */
 .panel-row {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14em, 100%), 1fr));
+  align-items: stretch;
   gap: 0.8em;
 }
 .panel {
-  flex: 1 1 0;
   min-width: 0;
-  max-width: 36em;
   max-height: 34vh;
   overflow: auto;
   padding: 0.6em 0.8em;
@@ -179,22 +191,12 @@ figure.map path { transition: fill 0.2s ease; }
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   backdrop-filter: blur(4px);
-  font-size: 0.8rem;
+  font-size: clamp(0.72rem, 1vw + 0.55rem, 0.8rem);
   pointer-events: auto;
 }
-/* A couple of panels (few rows, short content) can give up some of their
-   equal share of row width to their busier neighbours. Both flex-grow (for
-   viewports where the row is width-constrained) and a lower max-width (for
-   wide viewports where every panel already hits its cap and flex-grow alone
-   has nothing to redistribute) are needed to actually shrink them. */
-.panel.narrow { flex: 0.6 1 0; max-width: 25em; }
-/* Root Servers' 2-column layout is a fixed size regardless of panel width
-   (always the same 13 rows) — cap it more gently than .narrow so its two
-   columns don't get cramped. */
-.panel.compact { flex: 0.8 1 0; max-width: 31em; }
 .panel h2 {
   margin: 0 0 0.5em;
-  font-size: 0.75rem;
+  font-size: clamp(0.68rem, 0.6vw + 0.58rem, 0.75rem);
   font-weight: normal;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -266,7 +268,8 @@ figure.map path { transition: fill 0.2s ease; }
 }
 .status-list.outages .cname { text-decoration: none; color: var(--text-color); }
 .status-list.outages a:hover { text-decoration: underline; }
-.status-list.outages .detail { max-width: 8em; }
+.status-list.outages .pct { flex: none; width: 2.6em; text-align: right; color: var(--dim-color); font-size: 0.9em; }
+.status-list.outages .detail { max-width: 11em; }
 .status-list.anomalies .detail { max-width: none; }
 
 /* Response-time / percentage columns (root, TLD, resolvers, updown) share one
@@ -280,10 +283,26 @@ figure.map path { transition: fill 0.2s ease; }
   flex: none;
   max-width: none;
 }
+/* Root's own detail text ("30ms · 100%") is much shorter than the widest
+   of the other three lists that 10.5em was sized for — right-aligned in
+   that wide a box, it left a dead gap between the sparkline and the
+   visible digits instead of anything the box's own content needed. */
+.root-list .detail { width: 8em; }
 
-/* Root servers: one status-coloured letter + latency sparkline per root */
-.root-list { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 1em; }
-.root-list li { break-inside: avoid; }
+/* Root servers: one status-coloured letter + latency sparkline per root.
+   A responsive grid, not the old fixed 2-column multicol — multicol's
+   column count didn't respond to the *panel's* own width (only the page's,
+   via the mobile breakpoint below), so a panel narrow enough from the
+   panel-row's own reflow, but still short of that breakpoint, forced a
+   second column too narrow for its content and overlapping the first. */
+.root-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+  gap: 0 1em;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .root-list a {
   display: flex;
   align-items: center;
@@ -317,3 +336,52 @@ figcaption {
   font-size: 0.7rem;
 }
 figcaption a { color: var(--dim-color); }
+
+/* --- Mobile: stack panels below a shorter, centered map ----------------- */
+/* The desktop layout is a fixed 100vh dashboard with panels absolutely
+   overlaid on top of the map. Below this width there isn't room for that:
+   the map shrinks to a fixed-height band up top (still centered within it,
+   so it stays readable rather than being squeezed to a sliver), and the
+   panels drop out of the overlay into normal document flow underneath,
+   stacked one per row, with the page scrolling to reach them. */
+@media (max-width: 768px) {
+  html, body { height: auto; min-height: 100%; }
+  body { overflow-y: auto; overflow-x: hidden; }
+
+  figure.map { height: 46vh; }
+
+  /* Below the title instead of centered over it — at this width a short
+     score still risks colliding with the left-aligned h1, so it drops to
+     its own row rather than wrapping into a ragged two-line pill. */
+  .status-banner {
+    top: 2.6em;
+    left: 0.8em;
+    right: 0.8em;
+    justify-content: center;
+  }
+
+  .panels {
+    top: 100%;
+    right: 0.6em;
+    bottom: auto;
+    left: 0.6em;
+    gap: 0.6em;
+    padding-bottom: 1em;
+  }
+  /* Panel-row's own flex-wrap already collapses to one column at this
+     width; just let panels grow to their natural height instead of
+     scrolling inside a capped box, since the whole page scrolls now. */
+  .panel {
+    max-height: none;
+  }
+
+  /* The sparkline is the widest thing in a root-server row; drop it and a
+     narrower minimum still keeps 2 columns instead of falling back to 1. */
+  .root-list { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+  .root-list .spark,
+  .root-list .spark-empty { display: none; }
+
+  /* Stays absolute (not static) — turning it into an in-flow flex item
+     here would compete with svg.grid for row width and starve the map. */
+  figcaption { font-size: 0.65rem; }
+}

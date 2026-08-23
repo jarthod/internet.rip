@@ -11,7 +11,46 @@
   problems << "#{@outages.data[:count]} country outage(s)" if @outages.ok? && @outages.data && @outages.data[:count] > 0
   problems << "#{@tlds.data[:problems].size} TLD(s) degraded" if @tlds.ok? && @tlds.data && @tlds.data[:problems].any?
   any_loading = [@root, @services, @sites, @outages, @resolvers].any?(&:loading?)
-  overall = problems.any? ? "down" : (any_loading ? "unknown" : "ok")
+
+  # A single worldwide score for the banner, instead of spelling out every
+  # problem inline (still available as a hover tooltip below): the share of
+  # "up" units across monitors that have a natural up/total denominator.
+  # Outages/anomalies have no fixed universe to divide by, so instead of
+  # feeding the ratio they knock a couple of points off per severe one.
+  units_up = units_total = 0
+  if @root.ok? && @root.data
+    units_up += @root.data[:up]; units_total += @root.data[:total]
+  end
+  if @resolvers.ok? && @resolvers.data
+    units_up += @resolvers.data[:up]; units_total += @resolvers.data[:total]
+  end
+  if @sites.ok? && @sites.data
+    units_up += @sites.data[:up]; units_total += @sites.data[:total]
+  end
+  if @services.ok? && @services.data
+    units_up += @services.data.count { !%w[major critical].include?(_1[:indicator]) }
+    units_total += @services.data.size
+  end
+  if @tlds.ok? && @tlds.data && @tlds.data[:checked].to_i > 0
+    units_up += @tlds.data[:ok]; units_total += @tlds.data[:checked]
+  end
+  severe_outages = @outages.ok? && @outages.data ? @outages.data[:countries].count { _1[:severe] } : 0
+  worldwide_score = units_total > 0 ? [100.0 * units_up / units_total - severe_outages * 2, 0].max : nil
+
+  # Dot colour tracks the score itself (same ok/warn thresholds as the
+  # resolvers panel) rather than the raw problems list — a handful of minor
+  # IODA blips shouldn't turn the banner red the way an actual root-server
+  # or resolver outage should.
+  overall =
+    if any_loading || worldwide_score.nil?
+      "unknown"
+    elsif worldwide_score >= 98
+      "ok"
+    elsif worldwide_score >= 90
+      "warn"
+    else
+      "down"
+    end
 
   # Countries highlighted on the map by their ISO-2 <path> class: from IODA
   # connectivity outages, plus ccTLDs whose DNS (per DNSMON) is degraded.
@@ -27,7 +66,7 @@
   # floor low enough that it's unambiguously a real outage (40%).
   country_scores = Hash.new { |h, k| h[k] = [] }
   outage_countries.each do |c|
-    country_scores[c[:code]] << [c[:score] / OutagesMonitor::SEVERE_SCORE.to_f, 1.0].min
+    country_scores[c[:code]] << c[:pct] / 100.0
   end
   tld_problems.each do |t|
     next unless t[:cc]
@@ -86,10 +125,9 @@
 <%# Overall status banner %>
 <header class="status-banner status-<%= overall %>">
   <span class="dot"></span>
-  <span class="label">
-    <% if overall == "ok" %>All monitored systems nominal
-    <% elsif overall == "unknown" %>Collecting telemetry&hellip;
-    <% else %><%= problems.join(" · ") %><% end %>
+  <span class="label" title="<%= problems.join(" · ") if problems.any? %>">
+    <% if overall == "unknown" %>Collecting telemetry&hellip;
+    <% else %><%= worldwide_score.round(1) %>% operational<% end %>
   </span>
   <time class="clock" datetime="<%= Time.current.iso8601 %>"><%= Time.current.utc.strftime("%H:%M:%S UTC") %></time>
 </header>
@@ -111,12 +149,12 @@
           <li>
             <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
             <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
-            <% if c[:spark] %><%= sparkline(c[:spark]) %><% end %>
-            <% if c[:reason] %><span class="detail"><%= c[:reason] %></span><% end %>
+            <span class="pct"><%= c[:pct] %>%</span>
+            <span class="detail"><%= c[:reason] %></span>
           </li>
         <% end %>
       </ul>
-      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h") %>
+      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h &middot; % of IODA's severe-outage threshold".html_safe) %>
     <% end %>
   </section>
 
@@ -189,7 +227,7 @@
 
  <div class="panel-row bottom">
   <%# DNS root servers (measured by RIPE Atlas) %>
-  <section class="panel compact">
+  <section class="panel">
     <h2>DNS Root Servers
       <% if @root.ok? && @root.data %><span class="count"><%= @root.data[:up] %>/<%= @root.data[:total] %></span><% end %>
     </h2>
@@ -212,7 +250,7 @@
   </section>
 
   <%# ccTLD / gTLD name servers (RIPE DNSMON, sampled on rotation) %>
-  <section class="panel narrow">
+  <section class="panel">
     <h2>TLD Name Servers
       <% if @tlds.ok? && @tlds.data && @tlds.data[:checked] > 0 %><span class="count"><%= @tlds.data[:ok] %>/<%= @tlds.data[:checked] %></span><% end %>
     </h2>
@@ -240,7 +278,7 @@
   <%# Public recursive DNS resolvers — latency/uptime aggregated by PerfOps/DNSPerf
       from 200+ global vantage points (see PublicResolversMonitor for why that
       beats probing from just this one server). %>
-  <section class="panel narrow">
+  <section class="panel">
     <h2>Public DNS Resolvers
       <% if @resolvers.ok? && @resolvers.data %><span class="count"><%= @resolvers.data[:up] %>/<%= @resolvers.data[:total] %></span><% end %>
     </h2>

@@ -25,7 +25,7 @@ class DashboardTest < ActionDispatch::IntegrationTest
     seed TldMonitor,
       { zones: { "de" => tld_de }, total: 70, checked: 1, ok: 0, problems: [tld_de] }
     seed OutagesMonitor,
-      { countries: [{ code: "BZ", name: "Belize", score: 500_000, events: 1, severe: true,
+      { countries: [{ code: "BZ", name: "Belize", score: 500_000, pct: 100, events: 1, severe: true,
                       url: "https://ioda.inetintel.cc.gatech.edu/country/BZ" }],
         count: 1 }
     seed GripMonitor,

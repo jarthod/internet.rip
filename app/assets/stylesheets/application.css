@@ -186,6 +186,11 @@ figure.map path { transition: fill 0.2s ease; }
   min-width: 0;
   max-height: 34vh;
   overflow: auto;
+  /* Column so the "via <source>" footer can be pinned to the bottom of the
+     panel (grid stretches every panel in a row to the tallest one's height,
+     which would otherwise leave the footer floating mid-panel). */
+  display: flex;
+  flex-direction: column;
   padding: 0.6em 0.8em;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -206,7 +211,7 @@ figure.map path { transition: fill 0.2s ease; }
 }
 .panel h2 .count { color: var(--text-color); }
 .panel .loading { color: var(--dim-color); margin: 0.2em 0; font-style: italic; }
-.panel .source { margin: 0.5em 0 0; color: var(--dim-color); font-size: 0.85em; }
+.panel .source { margin: 0.5em 0 0; margin-top: auto; padding-top: 0.5em; color: var(--dim-color); font-size: 0.85em; }
 
 /* Status dot + list rows */
 .dot.ok      { background: var(--ok-color); }
@@ -245,12 +250,14 @@ figure.map path { transition: fill 0.2s ease; }
   white-space: nowrap;
   max-width: 9em;
 }
-/* Service status text can run long — truncate it to one line (full text on
-   hover via the title attribute) instead of wrapping the row taller. Here
-   it's the *status* text (not the name) that needs to grow into the row's
-   free space, the reverse of every other list below. */
-.status-list.services li a { flex: none; }
-.status-list.services .detail { flex: 1 1 auto; min-width: 0; max-width: none; }
+/* Service status / outage-reason text can run long — truncate it to one line
+   (full text on hover via the title attribute) instead of wrapping the row
+   taller. Here it's the trailing *detail* text (not the name) that grows into
+   the row's free space, the reverse of every other list below. */
+.status-list.services li a,
+.status-list.outages .cname { flex: none; }
+.status-list.services .detail,
+.status-list.outages .detail { flex: 1 1 auto; min-width: 0; max-width: none; }
 
 /* The "name" cell in these lists absorbs all leftover row width (ellipsis if
    it doesn't fit), pushing the trailing sparkline/detail to a consistent
@@ -258,7 +265,6 @@ figure.map path { transition: fill 0.2s ease; }
 .tld-list li a,
 .status-list.anomalies li a,
 .status-list.resolvers li a,
-.status-list.outages .cname,
 .status-list.updown .cname {
   flex: 1 1 auto;
   min-width: 0;
@@ -266,10 +272,18 @@ figure.map path { transition: fill 0.2s ease; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.status-list.outages .cname { text-decoration: none; color: var(--text-color); }
 .status-list.outages a:hover { text-decoration: underline; }
-.status-list.outages .pct { flex: none; width: 2.6em; text-align: right; color: var(--dim-color); font-size: 0.9em; }
-.status-list.outages .detail { max-width: 11em; }
+/* Country names are short; cap + ellipsis the rare long one so it can't shove
+   the reason text out of the row. */
+.status-list.outages .cname {
+  min-width: 0;
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--text-color);
+}
 .status-list.anomalies .detail { max-width: none; }
 
 /* Response-time / percentage columns (root, TLD, resolvers, updown) share one

@@ -61,8 +61,8 @@
   # indicator that flags it, then painted as a gradient between amber and
   # red instead of two flat buckets — a country just past one threshold no
   # longer reads identically to one with multiple compounding signals.
-  # Outage severity ramps up to OutagesMonitor's own "severe" cutoff; TLD
-  # severity ramps down from the "ok" boundary (98% queries answered) to a
+  # Outage severity is OutagesMonitor's measured "% below normal connectivity";
+  # TLD severity ramps down from the "ok" boundary (98% queries answered) to a
   # floor low enough that it's unambiguously a real outage (40%).
   country_scores = Hash.new { |h, k| h[k] = [] }
   outage_countries.each do |c|
@@ -84,7 +84,7 @@
   outage_countries.each do |c|
     next unless flagged.include?(c[:code])
     entry = (country_info[c[:code]] ||= { name: c[:name], lines: [] })
-    entry[:lines] << "#{c[:severe] ? "Severe" : "Partial"} connectivity outage#{" — #{c[:reason]}" if c[:reason]} (IODA)"
+    entry[:lines] << "#{c[:severe] ? "Severe" : "Partial"} connectivity outage — #{c[:reason_full] || c[:reason]} (IODA)"
   end
   tld_problems.each do |t|
     next unless flagged.include?(t[:cc])
@@ -136,7 +136,7 @@
  <div class="panel-row top">
   <%# Global connectivity outages (IODA) %>
   <section class="panel">
-    <h2>Connectivity Outages
+    <h2>Country Connectivity Outages
       <% if @outages.ok? && @outages.data %><span class="count"><%= @outages.data[:count] %></span><% end %>
     </h2>
     <% if @outages.loading? %>
@@ -149,12 +149,11 @@
           <li>
             <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
             <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
-            <span class="pct"><%= c[:pct] %>%</span>
-            <span class="detail"><%= c[:reason] %></span>
+            <span class="detail" title="<%= c[:reason_full] || c[:reason] %> &middot; <%= c[:pct] %>% below normal"><%= c[:reason] %> &middot; <%= c[:pct] %>%</span>
           </li>
         <% end %>
       </ul>
-      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h &middot; % of IODA's severe-outage threshold".html_safe) %>
+      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h &middot; % below normal connectivity".html_safe) %>
     <% end %>
   </section>
 
@@ -198,7 +197,7 @@
   <%# Failing checks by ISP (updown.io) — see UpdownMonitor for why this
       doesn't factor into the overall status banner. %>
   <section class="panel">
-    <h2>Failed Checks by AS
+    <h2>Failure Rate by ISP
       <% if @updown.ok? && @updown.data && @updown.data[:rate] %><span class="count"><%= (@updown.data[:rate] * 100).round(2) %>% failing</span><% end %>
     </h2>
     <% if @updown.loading? %>

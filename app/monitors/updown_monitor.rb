@@ -13,7 +13,7 @@
 # check nobody deleted, ...), so this is a feed to look at, not a health
 # signal — same reasoning as GripMonitor.
 class UpdownMonitor < BaseMonitor
-  self.title = "Failed Checks by AS"
+  self.title = "Failure Rate by ISP"
   self.interval = 120 # a bit longer than updown's own 60s upstream cache
 
   API = "https://updown.io/internet-rip/overview".freeze

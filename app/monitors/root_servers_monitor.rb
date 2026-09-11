@@ -29,7 +29,7 @@ class RootServersMonitor < BaseMonitor
   def build(server)
     results = Array(server["results"])
     latest = results.reverse.find { _1["queries"].to_i.positive? }
-    avail = latest && (100.0 * latest["replies"] / latest["queries"]).round
+    avail = latest && (100.0 * latest["replies"] / latest["queries"])
     median = latest && latest["rtt50"]&.round(1)
     spark = downsample(results.filter_map { _1["rtt50"] }, SPARK_POINTS)
 

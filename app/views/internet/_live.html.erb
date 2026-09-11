@@ -117,7 +117,8 @@
 <svg class="overlay heatmap" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 2000 857">
   <g filter="url(#heatmap-blur)">
     <% (@updown.data && @updown.data[:points] || []).each do |p| %>
-      <%= geo_circle(p[:lat], p[:lng], heat_radius(p[:count]), class: "heat-down") %>
+      <% radius = heat_radius(p[:count]) %>
+      <%= geo_circle(p[:lat], p[:lng], radius, class: "heat-down", opacity: radius/50) %>
     <% end %>
   </g>
 </svg>
@@ -134,66 +135,6 @@
 
 <div class="panels">
  <div class="panel-row top">
-  <%# Global connectivity outages (IODA) %>
-  <section class="panel">
-    <h2>Country Connectivity Outages
-      <% if @outages.ok? && @outages.data %><span class="count"><%= @outages.data[:count] %></span><% end %>
-    </h2>
-    <% if @outages.loading? %>
-      <p class="loading">loading&hellip;</p>
-    <% elsif @outages.data[:countries].empty? %>
-      <p class="loading">no country-level outages</p>
-    <% else %>
-      <ul class="status-list outages">
-        <% @outages.data[:countries].first(8).each do |c| %>
-          <li>
-            <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
-            <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
-            <span class="detail" title="<%= c[:reason_full] || c[:reason] %> &middot; <%= c[:pct] %>% below normal"><%= c[:reason] %> &middot; <%= c[:pct] %>%</span>
-          </li>
-        <% end %>
-      </ul>
-      <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h &middot; % below normal connectivity".html_safe) %>
-    <% end %>
-  </section>
-
-  <%# Service status pages %>
-  <section class="panel">
-    <h2>Major Hosting Services</h2>
-    <% if @services.loading? %>
-      <p class="loading">loading&hellip;</p>
-    <% else %>
-      <ul class="status-list services">
-        <% @services.data.each do |svc| %>
-          <% description = svc[:indicator] == "none" ? "Operational" : (svc[:description].presence || svc[:indicator]) %>
-          <li>
-            <span class="dot <%= status_class(svc[:indicator]) %>"></span>
-            <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
-            <span class="detail" title="<%= description %>"><%= description %></span>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-  </section>
-
-  <%# Public site reachability %>
-  <section class="panel">
-    <h2>Reachability</h2>
-    <% if @sites.loading? %>
-      <p class="loading">pinging&hellip;</p>
-    <% else %>
-      <ul class="status-list">
-        <% @sites.data[:sites].each do |site| %>
-          <li>
-            <span class="dot <%= status_class(site[:up]) %>"></span>
-            <a href="<%= site[:url] %>" target="_blank"><%= site[:name] %></a>
-            <span class="detail"><%= site[:up] ? "#{site[:ms]}ms" : (site[:error] || "down") %></span>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-  </section>
-
   <%# Failing checks by ISP (updown.io) — see UpdownMonitor for why this
       doesn't factor into the overall status banner. %>
   <section class="panel">
@@ -211,16 +152,77 @@
       <% spark_ceiling = [0.10, *@updown.data[:top_isps].flat_map { |i| i[:spark] }.compact].max %>
       <ul class="status-list updown">
         <% @updown.data[:top_isps].each do |i| %>
-          <li>
-            <span class="dot <%= i[:rate] >= 0.2 ? "down" : (i[:rate] >= 0.05 ? "warn" : "ok") %>"></span>
+          <% isp_status = i[:rate] >= 0.2 ? "down" : (i[:rate] >= 0.05 ? "warn" : "ok") %>
+          <li class="<%= isp_status %>">
+            <span class="dot <%= isp_status %>"></span>
             <span class="cname"><%= i[:name] %></span>
             <%= sparkline(i[:spark], ceiling: spark_ceiling) %>
-            <span class="detail"><%= (i[:rate] * 100).round(1) %>%</span>
+            <span class="detail"><%= number_to_percentage(i[:rate]*100, precision: 1) %></span>
           </li>
         <% end %>
       </ul>
       <%= source_line("updown.io", url: "https://updown.io", extra: "24h &middot; top ISPs by failure rate".html_safe) %>
     <% end %>
+  </section>
+
+  <%# Service status pages %>
+  <section class="panel">
+    <h2>Major Hosting Services</h2>
+    <% if @services.loading? %>
+      <p class="loading">loading&hellip;</p>
+    <% else %>
+      <ul class="status-list services">
+        <% @services.data.each do |svc| %>
+          <% description = svc[:indicator] == "none" ? "Operational" : (svc[:description].presence || svc[:indicator]) %>
+          <li class="<%= status_class(svc[:indicator]) %>">
+            <span class="dot <%= status_class(svc[:indicator]) %>"></span>
+            <a href="<%= svc[:url] %>" target="_blank"><%= svc[:name] %></a>
+            <span class="detail" title="<%= description %>"><%= description %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# Public site reachability %>
+  <section class="panel">
+    <h2>Reachability</h2>
+    <% if @sites.loading? %>
+      <p class="loading">pinging&hellip;</p>
+    <% else %>
+      <ul class="status-list">
+        <% @sites.data[:sites].each do |site| %>
+          <li class="<%= status_class(site[:up]) %>">
+            <span class="dot <%= status_class(site[:up]) %>"></span>
+            <a href="<%= site[:url] %>" target="_blank"><%= site[:name] %></a>
+            <span class="detail"><%= site[:up] ? "#{site[:ms]}ms" : (site[:error] || "down") %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <%# Global connectivity outages (IODA) %>
+  <section class="panel">
+    <h2>Country Connectivity Outages
+      <% if @outages.ok? && @outages.data %><span class="count"><%= @outages.data[:count] %></span><% end %>
+    </h2>
+    <% if @outages.loading? %>
+      <p class="loading">loading&hellip;</p>
+    <% elsif @outages.data[:countries].empty? %>
+      <p class="loading">no country-level outages</p>
+    <% else %>
+      <ul class="status-list outages">
+        <% @outages.data[:countries].first(8).each do |c| %>
+          <li class="<%= c[:severe] ? "down" : "warn" %>">
+            <span class="dot <%= c[:severe] ? "down" : "warn" %>"></span>
+            <a class="cname" href="<%= c[:url] %>" target="_blank"><%= c[:name] %></a>
+            <span class="detail" title="<%= c[:reason_full] || c[:reason] %> &middot; <%= c[:pct] %>% below normal"><%= c[:reason] %> &middot; <%= c[:pct] %>%</span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+    <%= source_line("IODA", url: "https://ioda.inetintel.cc.gatech.edu", extra: "24h &middot; % below normal connectivity".html_safe) %>
   </section>
  </div>
 
@@ -239,7 +241,7 @@
             <a href="<%= s[:url] %>" target="_blank" title="<%= s[:letter].upcase %>-root (RIPE DNSMON)">
               <span class="rletter"><%= s[:letter].upcase %></span>
               <%= sparkline(s[:spark]) %>
-              <span class="detail"><%= s[:median] ? "#{s[:median].round}ms" : "—" %> &middot; <%= s[:avail] || "—" %>%</span>
+              <span class="detail"><%= "#{number_with_precision(s[:median], precision: 0)||'— '}ms · #{(number_to_percentage(s[:avail], precision: 3, significant: true)||'—').ljust(5, ' ')}" %></span>
             </a>
           </li>
         <% end %>
@@ -259,11 +261,11 @@
       <% if @tlds.data[:problems].any? %>
         <ul class="status-list tld-list">
           <% @tlds.data[:problems].first(6).each do |t| %>
-            <li>
+            <li class="<%= t[:status] %>">
               <span class="dot <%= t[:status] %>"></span>
               <a href="<%= t[:url] %>" target="_blank" title="<%= t[:cc] %>">.<%= t[:name] %></a>
               <%= sparkline(t[:spark]) %>
-              <span class="detail"><%= t[:median] ? "#{t[:median].round}ms &middot; ".html_safe : "" %><%= t[:avail] %>%</span>
+              <span class="detail"><%= "#{number_with_precision(t[:median], precision: 0)||'— '}ms · #{(number_to_percentage(t[:avail], precision: 3, significant: true)||'—').ljust(5, ' ')}" %></span>
             </li>
           <% end %>
         </ul>
@@ -286,13 +288,13 @@
     <% else %>
       <ul class="status-list resolvers">
         <% @resolvers.data[:resolvers].each do |r| %>
-          <li>
+          <li class="<%= r[:status] %>">
             <span class="dot <%= r[:status] %>"></span>
             <a href="<%= r[:url] %>" target="_blank" title="mean query time today (partial day) · dot colour is the 30-day uptime: &ge;98% ok, &ge;95% warn">
               <%= r[:name] %>
             </a>
             <%= sparkline(r[:spark]) %>
-            <span class="detail"><%= r[:ms] ? "#{r[:ms]}ms &middot; #{r[:uptime]}%".html_safe : (r[:error] || "no data") %></span>
+            <span class="detail"><%= "#{number_with_precision(r[:ms], precision: 0)||'— '}ms · #{(number_to_percentage(r[:uptime], precision: 3, significant: true)||'—').ljust(5, ' ')}" %></span>
           </li>
         <% end %>
       </ul>
@@ -312,7 +314,7 @@
       <ul class="status-list anomalies">
         <% @grip.data[:events].first(6).each do |ev| %>
           <% tooltip = [ev[:label], ev[:prefixes].join(", "), ev[:explanation], ev[:countries].any? ? "ASes: #{ev[:countries].join(', ')}" : nil].compact.join(" · ") %>
-          <li>
+          <li class="<%= ev[:finished_at] ? "unknown" : "warn" %>">
             <span class="dot <%= ev[:finished_at] ? "unknown" : "warn" %>"></span>
             <a href="<%= ev[:url] %>" target="_blank" title="<%= tooltip %>"><%= ev[:prefixes].join(", ") %></a>
             <span class="detail"><%= ev[:finished_at] ? "resolved #{compact_duration(Time.current - ev[:finished_at])} ago" : "ongoing #{compact_duration(Time.current - ev[:time])}" %></span>

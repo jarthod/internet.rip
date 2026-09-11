@@ -63,7 +63,7 @@ module InternetHelper
   # Dot radius for the updown.io failing-checks heatmap, scaled by how many
   # failing checks are in that bucket. sqrt (not linear) so a handful of
   # busy hotspots don't dwarf everything else on the map.
-  def heat_radius(count, min: 3, max: 16)
+  def heat_radius(count, min: 3, max: 32)
     [min + Math.sqrt(count) * 1.8, max].min.round(1)
   end
 
@@ -134,7 +134,7 @@ module InternetHelper
       y = (height - 1 - v / max * (height - 2)).round(1)
       "#{x},#{y}"
     end
-    tag.svg(viewBox: "0 0 #{width} #{height}", class: "spark", **attrs) do
+    tag.svg(viewBox: "0 0 #{width} #{height}", preserveAspectRatio: 'none', class: "spark", **attrs) do
       tag.polyline(points: points.join(" "), fill: "none")
     end
   end

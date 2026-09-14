@@ -16,6 +16,10 @@ Rails.application.configure do
   config.consider_all_requests_local = false
   config.action_controller.perform_caching = true
 
+  # Caddy doesn't cache responses itself, so cache publicly-cacheable actions
+  # (see InternetController's `expires_in`) here instead.
+  config.middleware.use Rack::Cache, verbose: false
+
   # Ensures that a master key has been made available in ENV["RAILS_MASTER_KEY"], config/master.key, or an environment
   # key such as config/credentials/production.key. This key is used to decrypt credentials (and other encrypted files).
   # config.require_master_key = true
@@ -50,8 +54,9 @@ Rails.application.configure do
   # want to log everything, set the level to "debug".
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
-  # Use a different cache store in production.
-  # config.cache_store = :mem_cache_store
+  # Persist monitor snapshots to disk instead of application.rb's in-process
+  # memory_store, so they survive Puma restarts and redeploys.
+  config.cache_store = :file_store, Rails.root.join("tmp/cache")
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   # config.active_job.queue_adapter = :resque

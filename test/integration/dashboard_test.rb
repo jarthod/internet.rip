@@ -80,14 +80,11 @@ class DashboardTest < ActionDispatch::IntegrationTest
     assert_match "resolved", @response.body        # finished BGP anomaly renders without crashing
     assert_select ".resolvers .spark polyline"                      # resolver latency sparkline
     assert_select ".resolvers a[href=?]", "https://1.1.1.1/"
-    assert_match "1 public DNS resolver(s) down", @response.body    # down resolver feeds the status banner
     assert_select "svg.heatmap .heat-down", 2                       # updown.io failing-check heatmap dots
     assert_select ".status-list.updown .spark polyline"             # per-ISP 24h failure-rate sparkline
     assert_match "Failure Rate by ISP", @response.body
     assert_match "9.0% failing", @response.body                     # global failure rate badge
     assert_match "OVH SAS", @response.body
-    banner_text = css_select(".status-banner .label").text
-    assert_no_match(/OVH|updown/i, banner_text) # updown's failures don't feed the overall status banner
 
     # Flagged-country tooltip data island (applied client-side to the map's
     # <path> elements; see application.html.erb's poller script).
@@ -113,6 +110,6 @@ class DashboardTest < ActionDispatch::IntegrationTest
 
     get root_path
     assert_response :success
-    assert_match "Collecting telemetry", @response.body
+    assert_select ".status-banner.status-unknown" # dot stays dim until every monitor has reported
   end
 end

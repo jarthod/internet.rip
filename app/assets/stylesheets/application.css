@@ -41,6 +41,7 @@ body {
   margin: 0;
   overflow: hidden;
   font-family: BerkeleyMono, 'IBM Plex Mono', 'Share Tech Mono', 'Nimbus Mono PS', 'Courier New', monospace;
+  text-shadow: 0.15em 0 hsl(var(--theme-color), 60%, 25%);
 }
 
 a {
@@ -64,7 +65,20 @@ blink { animation: blink-caret 1s 4 step-end; }
   margin: 0;
   font-weight: normal;
   font-size: 1.5rem;
-  text-shadow: 3px 0 hsl(var(--theme-color), 60%, 25%);
+  text-shadow: 0.15em 0 hsl(var(--theme-color), 60%, 25%); /* the global shadow does not follow font-size changes otherwise */
+}
+.site-header small {
+  display: block;
+  margin-left: 7.5em;
+  margin-top: -0.1em;
+  font-size: 0.75em;
+  opacity: 0.5;
+  font-weight: normal;
+}
+.site-header i {
+  font-style: normal;
+  display: inline-block;
+  transform: scaleY(-1);
 }
 
 /* --- Map ---------------------------------------------------------------- */
@@ -138,8 +152,8 @@ figure.map path { transition: fill 0.2s ease; }
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 0.6em;
-  padding: 0.4em 1em;
+  gap: 0.5em;
+  padding-left: 1em;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
@@ -152,6 +166,17 @@ figure.map path { transition: fill 0.2s ease; }
 .status-down .dot    { background: var(--down-color); box-shadow: 0 0 6px var(--down-color); }
 .status-unknown .dot { background: var(--dim-color); }
 .status-banner .clock { color: var(--dim-color); }
+.refresh-toggle {
+  display: flex;
+  padding: 0.7em;
+  border: none;
+  background: none;
+  color: var(--dim-color);
+  cursor: pointer;
+}
+.refresh-toggle svg { width: 1em; height: 1em; fill: currentColor; }
+.refresh-toggle.paused { color: var(--warn-color); }
+.refresh-toggle:hover { color: var(--text-color); background-color: var(--map-color); }
 
 .panels {
   position: absolute;
@@ -314,14 +339,7 @@ figcaption .dot {
   html, body { height: auto; min-height: 100%; }
   body { overflow-y: auto; overflow-x: hidden; }
 
-  figure.map { height: 65vw; }
-
-  .status-banner {
-    top: 2.6em;
-    left: 0.8em;
-    right: 0.8em;
-    justify-content: center;
-  }
+  figure.map { height: 60vw; }
 
   .panels {
     top: 100%;

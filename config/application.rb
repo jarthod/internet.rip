@@ -28,8 +28,10 @@ module InternetRip
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
 
-    # Monitors cache their results in-process, so we need a real cache store in
-    # every environment (the default NullStore in development would disable it).
+    # Monitors cache their results, so we need a real cache store in every
+    # environment (the default NullStore in development would disable it).
+    # Production overrides this with a persistent :file_store — see
+    # config/environments/production.rb.
     config.cache_store = :memory_store
 
     # Configuration for the application, engines, and railties goes here.

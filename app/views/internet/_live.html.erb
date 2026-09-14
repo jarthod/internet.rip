@@ -1,56 +1,9 @@
 <%
-  # Overall internet health, derived from the individual monitors.
-  problems = []
-  problems << "#{@root.data[:total] - @root.data[:up]} root server(s) down" if @root.ok? && @root.data && @root.data[:up] < @root.data[:total]
-  problems << "#{@resolvers.data[:total] - @resolvers.data[:up]} public DNS resolver(s) down" if @resolvers.ok? && @resolvers.data && @resolvers.data[:up] < @resolvers.data[:total]
-  if @services.ok? && @services.data
-    bad = @services.data.count { %w[major critical].include?(_1[:indicator]) }
-    problems << "#{bad} service(s) degraded" if bad > 0
-  end
-  problems << "#{@sites.data[:total] - @sites.data[:up]} site(s) unreachable" if @sites.ok? && @sites.data && @sites.data[:up] < @sites.data[:total]
-  problems << "#{@outages.data[:count]} country outage(s)" if @outages.ok? && @outages.data && @outages.data[:count] > 0
-  problems << "#{@tlds.data[:problems].size} TLD(s) degraded" if @tlds.ok? && @tlds.data && @tlds.data[:problems].any?
-  any_loading = [@root, @services, @sites, @outages, @resolvers].any?(&:loading?)
-
-  # A single worldwide score for the banner, instead of spelling out every
-  # problem inline (still available as a hover tooltip below): the share of
-  # "up" units across monitors that have a natural up/total denominator.
-  # Outages/anomalies have no fixed universe to divide by, so instead of
-  # feeding the ratio they knock a couple of points off per severe one.
-  units_up = units_total = 0
-  if @root.ok? && @root.data
-    units_up += @root.data[:up]; units_total += @root.data[:total]
-  end
-  if @resolvers.ok? && @resolvers.data
-    units_up += @resolvers.data[:up]; units_total += @resolvers.data[:total]
-  end
-  if @sites.ok? && @sites.data
-    units_up += @sites.data[:up]; units_total += @sites.data[:total]
-  end
-  if @services.ok? && @services.data
-    units_up += @services.data.count { !%w[major critical].include?(_1[:indicator]) }
-    units_total += @services.data.size
-  end
-  if @tlds.ok? && @tlds.data && @tlds.data[:checked].to_i > 0
-    units_up += @tlds.data[:ok]; units_total += @tlds.data[:checked]
-  end
-  severe_outages = @outages.ok? && @outages.data ? @outages.data[:countries].count { _1[:severe] } : 0
-  worldwide_score = units_total > 0 ? [100.0 * units_up / units_total - severe_outages * 2, 0].max : nil
-
-  # Dot colour tracks the score itself (same ok/warn thresholds as the
-  # resolvers panel) rather than the raw problems list — a handful of minor
-  # IODA blips shouldn't turn the banner red the way an actual root-server
-  # or resolver outage should.
-  overall =
-    if any_loading || worldwide_score.nil?
-      "unknown"
-    elsif worldwide_score >= 98
-      "ok"
-    elsif worldwide_score >= 90
-      "warn"
-    else
-      "down"
-    end
+  # Banner clock/dot: most recent `updated_at` across every monitor (not the
+  # oldest — PublicResolversMonitor only refreshes hourly by design).
+  live_monitors = [@root, @tlds, @services, @sites, @outages, @grip, @resolvers, @updown]
+  last_update = live_monitors.any?(&:loading?) ? nil : live_monitors.map(&:updated_at).max
+  freshness = freshness_class(last_update && Time.current - last_update)
 
   # Countries highlighted on the map by their ISO-2 <path> class: from IODA
   # connectivity outages, plus ccTLDs whose DNS (per DNSMON) is degraded.
@@ -123,14 +76,15 @@
   </g>
 </svg>
 
-<%# Overall status banner %>
-<header class="status-banner status-<%= overall %>">
+<%# Overall status banner: dot shows data freshness. %>
+<header class="status-banner status-<%= freshness %>">
   <span class="dot"></span>
-  <span class="label" title="<%= problems.join(" · ") if problems.any? %>">
-    <% if overall == "unknown" %>Collecting telemetry&hellip;
-    <% else %><%= worldwide_score.round(1) %>% operational<% end %>
-  </span>
-  <time class="clock" datetime="<%= Time.current.iso8601 %>"><%= Time.current.utc.strftime("%H:%M:%S UTC") %></time>
+  <time class="clock" datetime="<%= last_update&.iso8601 %>" title="time of the last successful data update">
+    <%= last_update ? last_update.utc.strftime("%H:%M:%S UTC") : "—" %>
+  </time>
+  <button type="button" class="refresh-toggle" title="Pause auto-refresh">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="1" width="3" height="10"></rect><rect x="7" y="1" width="3" height="10"></rect></svg>
+  </button>
 </header>
 
 <div class="panels">

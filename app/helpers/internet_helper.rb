@@ -158,6 +158,15 @@ module InternetHelper
     tag.p(safe_join(parts), class: "source")
   end
 
+  # CSS status class for how long ago something last updated, in seconds.
+  # Used for the status banner's dot: freshness, not health score.
+  def freshness_class(age_seconds)
+    return "unknown" if age_seconds.nil?
+    return "ok" if age_seconds < 60
+    return "warn" if age_seconds < 3600
+    "down"
+  end
+
   # CSS status class for a statuspage indicator or an up/down boolean.
   def status_class indicator
     case indicator.to_s

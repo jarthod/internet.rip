@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="description" content="A high-level status page for the internet: DNS root servers, major services, reachability and world events on a live map.">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
@@ -14,6 +13,7 @@
   <body>
     <header class="site-header">
       <h1>(×_×) Internet.RIP<blink>_</blink></h1>
+      <small><i>⎇</i> Also on RIPinter.net</small>
     </header>
     <%= yield %>
 
@@ -23,6 +23,11 @@
         var live = document.getElementById("live");
         if (!live) return;
         var url = live.dataset.refreshUrl;
+
+        // Persisted so a paused dashboard (e.g. frozen for a screenshot)
+        // stays paused across reloads.
+        var autoRefresh = true;
+        try { autoRefresh = localStorage.getItem("internet-rip-autorefresh") !== "off"; } catch (e) { /* private mode: default on */ }
 
         // <script>s inserted via innerHTML never execute, so the per-country
         // tooltip data travels as a JSON island (#country-issues, rendered by
@@ -47,20 +52,42 @@
           });
         }
 
+        // Small inline icons instead of emoji, which render as oddly-coloured
+        // pictographs on most platforms instead of picking up the theme.
+        var PAUSE_ICON = '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="1" width="3" height="10"></rect><rect x="7" y="1" width="3" height="10"></rect></svg>';
+        var PLAY_ICON = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1 L11 6 L2.5 11 Z"></path></svg>';
+
+        // The toggle button is replaced along with the rest of #live on every
+        // refresh, so its on/off appearance has to be reapplied here rather
+        // than surviving in the server-rendered markup.
+        function applyToggleState() {
+          var btn = live.querySelector(".refresh-toggle");
+          if (!btn) return;
+          btn.innerHTML = autoRefresh ? PAUSE_ICON : PLAY_ICON;
+          btn.title = autoRefresh ? "Pause auto-refresh" : "Resume auto-refresh (frozen for screenshots)";
+          btn.classList.toggle("paused", !autoRefresh);
+        }
+
         async function refresh() {
+          if (!autoRefresh) return;
           try {
             var res = await fetch(url, { headers: { "X-Requested-With": "fetch" } });
-            if (res.ok) { live.innerHTML = await res.text(); applyCountryTooltips(); }
+            if (res.ok) { live.innerHTML = await res.text(); applyCountryTooltips(); applyToggleState(); }
           } catch (e) { /* offline: keep showing the last snapshot */ }
         }
-        applyCountryTooltips(); // the first render's data island is already in the DOM
-        setInterval(refresh, 12000);
 
-        // Tick the clock locally between refreshes for a live feel.
-        setInterval(function () {
-          var clock = live.querySelector(".clock");
-          if (clock) clock.textContent = new Date().toISOString().substr(11, 8) + " UTC";
-        }, 1000);
+        // Delegated: the button itself is swapped out on every refresh.
+        live.addEventListener("click", function (e) {
+          if (!e.target.closest(".refresh-toggle")) return;
+          autoRefresh = !autoRefresh;
+          try { localStorage.setItem("internet-rip-autorefresh", autoRefresh ? "on" : "off"); } catch (e) { /* private mode: not persisted */ }
+          applyToggleState();
+          if (autoRefresh) refresh();
+        });
+
+        applyCountryTooltips(); // the first render's data island is already in the DOM
+        applyToggleState();
+        setInterval(refresh, 12000);
       })();
     </script>
   </body>

@@ -3,11 +3,13 @@ class InternetController < ApplicationController
 
   # Full dashboard: heavy static base map + the live overlay/panels.
   def index
+    expires_in 15.seconds, public: true
   end
 
   # Just the dynamic layer, polled by the browser every few seconds so the big
   # base map doesn't have to be re-rendered.
   def live
+    expires_in 10.seconds, public: true
     render partial: "live", layout: false
   end
 

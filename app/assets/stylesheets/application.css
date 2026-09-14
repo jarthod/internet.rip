@@ -153,7 +153,7 @@ figure.map path { transition: fill 0.2s ease; }
   display: flex;
   align-items: center;
   gap: 0.5em;
-  padding-left: 1em;
+  padding-left: 0.7em;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 4px;
@@ -166,6 +166,25 @@ figure.map path { transition: fill 0.2s ease; }
 .status-down .dot    { background: var(--down-color); box-shadow: 0 0 6px var(--down-color); }
 .status-unknown .dot { background: var(--dim-color); }
 .status-banner .clock { color: var(--dim-color); }
+
+/* A ring pulsing outward from the freshness dot shows auto-refresh is
+   active. Forced to a static grey while paused — a colour it can never
+   update out of would be misleading. */
+.status-banner .dot { position: relative; margin: 0 0.2em; }
+.status-banner .dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: dot-pulse 3s ease-out infinite;
+}
+.status-banner.paused .dot { background: var(--dim-color); box-shadow: none; }
+.status-banner.paused .dot::after { animation: none; }
+@keyframes dot-pulse {
+  from { transform: scale(1); opacity: 0.6; }
+  to   { transform: scale(3); opacity: 0; }
+}
 .refresh-toggle {
   display: flex;
   padding: 0.7em;
@@ -173,10 +192,11 @@ figure.map path { transition: fill 0.2s ease; }
   background: none;
   color: var(--dim-color);
   cursor: pointer;
+  border-radius: 2px;
 }
 .refresh-toggle svg { width: 1em; height: 1em; fill: currentColor; }
 .refresh-toggle.paused { color: var(--warn-color); }
-.refresh-toggle:hover { color: var(--text-color); background-color: var(--map-color); }
+.refresh-toggle:hover { color: var(--link-color); background-color: var(--map-color); }
 
 .panels {
   position: absolute;

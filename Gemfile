@@ -25,10 +25,4 @@ group :test do
   gem "selenium-webdriver"
 end
 
-group :production do
-  # HTTP caching middleware: serves repeat GETs to publicly-cacheable actions
-  # straight from an in-process cache. See config/environments/production.rb.
-  gem "rack-cache", require: "rack/cache"
-end
-
 gem "countries", "~> 8.1"

@@ -1,19 +1,25 @@
 class InternetController < ApplicationController
+  # In-process rather than Rails.cache (a file store in production) to avoid many disk writes
+  PAGE_CACHE = ActiveSupport::Cache::MemoryStore.new(size: 4.megabytes)
+
   before_action :load_monitors
 
   # Full dashboard: heavy static base map + the live overlay/panels.
   def index
-    expires_in 15.seconds, public: true
+    render html: cached_page("index") { render_to_string }
   end
 
   # Just the dynamic layer, polled by the browser every few seconds so the big
   # base map doesn't have to be re-rendered.
   def live
-    expires_in 10.seconds, public: true
-    render partial: "live", layout: false
+    render html: cached_page("live") { render_to_string(partial: "live", layout: false) }
   end
 
   private
+
+  def cached_page(key, &block)
+    PAGE_CACHE.fetch(key, expires_in: 10.seconds, race_condition_ttl: 5.seconds, &block).html_safe
+  end
 
   def load_monitors
     # Read snapshots first: referencing each constant ensures it is autoloaded

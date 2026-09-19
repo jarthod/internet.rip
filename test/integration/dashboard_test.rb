@@ -9,6 +9,7 @@ class DashboardTest < ActionDispatch::IntegrationTest
   # refresh is triggered) and the page renders real data.
   setup do
     Rails.cache.clear
+    InternetController::PAGE_CACHE.clear
     seed RootServersMonitor,
       { servers: [{ letter: "a", msm_id: 10009, avail: 100, median: 12.3, up: true,
                     spark: [10, 12, 11, 13, 12], url: "https://atlas.ripe.net/measurements/10009/" }],
@@ -101,6 +102,20 @@ class DashboardTest < ActionDispatch::IntegrationTest
     assert_select ".status-banner"
     assert_select "section.panel", minimum: 4
     assert_no_match(/<html/, @response.body)
+  end
+
+  test "rendered pages are cached briefly, one entry per page" do
+    get "/live"
+    first = @response.body
+    seed OutagesMonitor, { countries: [], count: 0 }
+
+    get "/live"
+    assert_equal first, @response.body
+
+    travel 16.seconds
+    get "/live"
+    assert_not_equal first, @response.body
+    assert_equal 1, InternetController::PAGE_CACHE.instance_variable_get(:@data).size
   end
 
   test "the page still renders on a cold cache without blocking" do

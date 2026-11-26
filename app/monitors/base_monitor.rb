@@ -64,9 +64,10 @@ class BaseMonitor
     return unless Rails.cache.write(lock_key, true, unless_exist: true, expires_in: 2.minutes)
 
     Thread.new do
-      Rails.application.executor.wrap { refresh! }
+      ok = Rails.application.executor.wrap { refresh! }
     ensure
-      Rails.cache.delete(lock_key)
+      # On failure hold the lock for one interval, so a down source isn't retried on every poll.
+      ok == false ? Rails.cache.write(lock_key, true, expires_in: interval.seconds) : Rails.cache.delete(lock_key)
     end
   end
 
@@ -74,6 +75,7 @@ class BaseMonitor
   def self.refresh!
     data = new.fetch
     Rails.cache.write(cache_key, { data: data, updated_at: Time.current, error: nil })
+    true
   rescue => e
     Rails.logger.warn("[#{name}] refresh failed: #{e.class}: #{e.message}")
     previous = Rails.cache.read(cache_key)
@@ -82,6 +84,7 @@ class BaseMonitor
       updated_at: previous&.dig(:updated_at),
       error: "#{e.class}: #{e.message}"
     })
+    false
   end
 
   # --- HTTP / DNS helpers for subclasses ------------------------------------

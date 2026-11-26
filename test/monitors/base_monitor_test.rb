@@ -41,6 +41,18 @@ class BaseMonitorTest < ActiveSupport::TestCase
     assert_equal 42, snapshot.data[:value], "stale data should be retained on failure"
   end
 
+  test "a failed background refresh backs off for one interval" do
+    DummyMonitor.boom = true
+    DummyMonitor.refresh_if_stale.join
+    assert Rails.cache.exist?(DummyMonitor.lock_key), "lock should be held after a failure"
+    assert_nil DummyMonitor.refresh_if_stale, "no retry while backing off"
+
+    DummyMonitor.boom = false
+    Rails.cache.delete(DummyMonitor.lock_key)
+    DummyMonitor.refresh_if_stale.join
+    assert_not Rails.cache.exist?(DummyMonitor.lock_key), "lock should be released after a success"
+  end
+
   test "stale? honours the configured interval" do
     Rails.cache.write(DummyMonitor.cache_key, { data: {}, updated_at: 1.hour.ago, error: nil })
     assert DummyMonitor.snapshot.stale?(DummyMonitor.interval)

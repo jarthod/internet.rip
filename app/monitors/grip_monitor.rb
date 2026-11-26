@@ -12,7 +12,7 @@ class GripMonitor < BaseMonitor
   self.title = "Routing Anomalies"
   self.interval = 300
 
-  API = "https://api.grip.inetintel.cc.gatech.edu/dev/json/events".freeze
+  API = "https://api.grip.inetintel.cc.gatech.edu/v1/json/events".freeze
   WEB = "https://grip.inetintel.cc.gatech.edu/v1/events".freeze
   WINDOW = 24 * 3600
   MIN_SUSPICION = 80
